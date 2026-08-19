@@ -53,7 +53,7 @@
       "inputs": [{"name": "text", "type": "STRING", "link": 5}],
       "outputs": [{"name": "annotated_page", "type": "IMAGE", "links": [6, 7], "slot_index": 0}],
       "properties": {"Node name for S&R": "KoreanBookTextToImage"},
-      "widgets_values": ["마음에 남는 문장.", 1200, 48, 32, 80, 24, "both", "AUTO", "AUTO", "#202020", "#3F6FB5", "#FFF176", "#FFFDF7"]
+      "widgets_values": ["", 1200, 48, 32, 80, 24, "AUTO", "AUTO", "#202020", "#3F6FB5", "#FFF176", "#FFFDF7"]
     },
     {
       "id": 5,

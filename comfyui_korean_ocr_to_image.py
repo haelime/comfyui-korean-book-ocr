@@ -8,6 +8,7 @@ Install the optional OCR dependencies into ComfyUI's Python environment:
 from __future__ import annotations
 
 import os
+import re
 from functools import lru_cache
 
 import numpy as np
@@ -272,6 +273,111 @@ def _wrap_line(draw, line, font, max_width):
     return output
 
 
+def _parse_inline_markdown(line: str):
+    """Parse the deliberately small Markdown subset used by the renderer."""
+    tokens = []
+    index = 0
+    markers = (("__", "underline"), ("~~", "highlight"), ("*", "italic"))
+    while index < len(line):
+        ref = re.match(r"\[\^([^\]]+)\]", line[index:])
+        if ref:
+            tokens.append({"style": "reference", "text": ref.group(1)})
+            index += ref.end()
+            continue
+        matched = False
+        for marker, style in markers:
+            if line.startswith(marker, index):
+                end = line.find(marker, index + len(marker))
+                if end > index + len(marker):
+                    tokens.append({"style": style, "text": line[index + len(marker):end]})
+                    index = end + len(marker)
+                    matched = True
+                    break
+        if matched:
+            continue
+        next_positions = []
+        for marker, _ in markers:
+            pos = line.find(marker, index + 1)
+            if pos >= 0:
+                next_positions.append(pos)
+        ref_pos = line.find("[^", index + 1)
+        if ref_pos >= 0:
+            next_positions.append(ref_pos)
+        end = min(next_positions) if next_positions else len(line)
+        tokens.append({"style": "plain", "text": line[index:end]})
+        index = end
+    return tokens
+
+
+def _parse_markdown_document(text: str):
+    footnotes = {}
+    body_lines = []
+    for line in text.splitlines():
+        definition = re.match(r"^\[\^([^\]]+)\]:\s*(.*)$", line)
+        if definition:
+            footnotes[definition.group(1)] = definition.group(2).strip()
+        else:
+            body_lines.append(_parse_inline_markdown(line))
+    if not body_lines:
+        body_lines = [[]]
+    return body_lines, footnotes
+
+
+def _wrap_styled_lines(draw, source_lines, font, reference_font, max_width):
+    wrapped = []
+    for source in source_lines:
+        current = []
+        current_width = 0
+        if not source:
+            wrapped.append([])
+            continue
+        for token in source:
+            style = token["style"]
+            if style == "reference":
+                display = f"[{token['text']}]"
+                width = draw.textbbox((0, 0), display, font=reference_font)[2]
+                if current and current_width + width > max_width:
+                    wrapped.append(current)
+                    current, current_width = [], 0
+                current.append({"style": style, "text": token["text"]})
+                current_width += width
+                continue
+            for char in token["text"]:
+                width = draw.textbbox((0, 0), char, font=font)[2]
+                if current and current_width + width > max_width:
+                    wrapped.append(current)
+                    current, current_width = [], 0
+                    if char.isspace():
+                        continue
+                if current and current[-1]["style"] == style:
+                    current[-1]["text"] += char
+                else:
+                    current.append({"style": style, "text": char})
+                current_width += width
+        wrapped.append(current)
+    return wrapped
+
+
+def _draw_italic_text(canvas, xy, text, font, fill):
+    """Draw synthetic italic text so Korean fonts without italic faces still work."""
+    if not text:
+        return
+    bbox = font.getbbox(text)
+    width = max(1, bbox[2] + 8)
+    height = max(1, bbox[3] + 8)
+    shear = 0.20
+    shift = int(height * shear) + 4
+    layer = Image.new("RGBA", (width + shift, height), (0, 0, 0, 0))
+    ImageDraw.Draw(layer).text((2, 0), text, font=font, fill=fill)
+    slanted = layer.transform(
+        layer.size,
+        Image.Transform.AFFINE,
+        (1, shear, -shear * height, 0, 1, 0),
+        resample=Image.Resampling.BICUBIC,
+    )
+    canvas.alpha_composite(slanted, (int(xy[0]), int(xy[1])))
+
+
 class KoreanTextToImage:
     @classmethod
     def INPUT_TYPES(cls):
@@ -339,7 +445,6 @@ class KoreanBookTextToImage:
                 "comment_font_size": ("INT", {"default": 32, "min": 8, "max": 256}),
                 "padding": ("INT", {"default": 80, "min": 0, "max": 1024}),
                 "line_spacing": ("INT", {"default": 24, "min": 0, "max": 256}),
-                "decoration": (["both", "highlighter", "colored_pencil_underline", "none"], {"default": "both"}),
                 "font_path": ("STRING", {"default": "AUTO"}),
                 "comment_font_path": ("STRING", {"default": "AUTO"}),
                 "text_color": ("STRING", {"default": "#202020"}),
@@ -355,7 +460,7 @@ class KoreanBookTextToImage:
     CATEGORY = "Korean OCR"
 
     def render_book_page(self, text, comment, width, font_size, comment_font_size, padding,
-                         line_spacing, decoration, font_path, comment_font_path, text_color,
+                         line_spacing, font_path, comment_font_path, text_color,
                          pencil_color, highlight_color, background_color):
         font, _ = _load_font(font_path, font_size)
         comment_font, _ = _load_handwriting_font(comment_font_path, comment_font_size)
@@ -363,11 +468,23 @@ class KoreanBookTextToImage:
         measure = ImageDraw.Draw(scratch)
         usable_width = max(1, width - 2 * padding)
 
-        lines = []
-        for source in (text.splitlines() or [""]):
-            lines.extend(_wrap_line(measure, source, font, usable_width))
+        reference_font, _ = _load_font(font_path, max(12, int(font_size * 0.55)))
+        source_lines, footnotes = _parse_markdown_document(text)
+        lines = _wrap_styled_lines(measure, source_lines, font, reference_font, usable_width)
+
+        referenced_ids = []
+        for line in lines:
+            for token in line:
+                if token["style"] == "reference" and token["text"] not in referenced_ids:
+                    referenced_ids.append(token["text"])
+        note_sources = []
+        for ref_id in referenced_ids:
+            if footnotes.get(ref_id):
+                note_sources.append(f"[{ref_id}] {footnotes[ref_id]}")
+        if comment.strip():
+            note_sources.extend(comment.splitlines())
         comment_lines = []
-        for source in comment.splitlines():
+        for source in note_sources:
             comment_lines.extend(_wrap_line(measure, source, comment_font, usable_width - 48))
 
         main_box = measure.textbbox((0, 0), "한글Ag", font=font)
@@ -386,30 +503,43 @@ class KoreanBookTextToImage:
         pencil_rgb = ImageColor.getrgb(pencil_color)
         highlight_rgb = ImageColor.getrgb(highlight_color)
 
-        for index, line in enumerate(lines):
-            line_width = measure.textbbox((0, 0), line, font=font)[2]
+        for line_index, line in enumerate(lines):
             x = padding
-            if line and decoration in ("both", "highlighter"):
-                top = y + int(main_height * 0.48)
-                bottom = y + main_height + 5
-                draw.rounded_rectangle(
-                    (x - 7, top, x + line_width + 9, bottom),
-                    radius=max(3, font_size // 7),
-                    fill=highlight_rgb + (92,),
-                )
-            draw.text((x, y), line, font=font, fill=text_fill)
-            if line and decoration in ("both", "colored_pencil_underline"):
-                baseline = y + main_height + 7
-                # Three deterministic, slightly uneven strokes mimic colored pencil grain.
-                offsets = ((0, 0, 90), (2, 1, 65), (-1, 3, 45))
-                for dx, dy, alpha in offsets:
-                    points = []
-                    segments = max(2, line_width // 24)
-                    for step in range(segments + 1):
-                        px = x + dx + (line_width * step / segments)
-                        jitter = ((step * 7 + index * 3) % 5) - 2
-                        points.append((px, baseline + dy + jitter * 0.35))
-                    draw.line(points, fill=pencil_rgb + (alpha,), width=max(1, font_size // 25))
+            for token in line:
+                style, value = token["style"], token["text"]
+                if style == "reference":
+                    display = f"[{value}]"
+                    draw.text(
+                        (x, y - 3), display, font=reference_font,
+                        fill=(190, 38, 45, 235),
+                    )
+                    x += measure.textbbox((0, 0), display, font=reference_font)[2]
+                    continue
+                span_width = measure.textbbox((0, 0), value, font=font)[2]
+                if style == "highlight" and value:
+                    top = y + int(main_height * 0.46)
+                    bottom = y + main_height + 5
+                    draw.rounded_rectangle(
+                        (x - 5, top, x + span_width + 7, bottom),
+                        radius=max(3, font_size // 7),
+                        fill=highlight_rgb + (96,),
+                    )
+                if style == "italic":
+                    _draw_italic_text(canvas, (x, y), value, font, text_fill)
+                else:
+                    draw.text((x, y), value, font=font, fill=text_fill)
+                if style == "underline" and value:
+                    baseline = y + main_height + 7
+                    offsets = ((0, 0, 90), (2, 1, 65), (-1, 3, 45))
+                    for dx, dy, alpha in offsets:
+                        points = []
+                        segments = max(2, span_width // 24)
+                        for step in range(segments + 1):
+                            px = x + dx + (span_width * step / segments)
+                            jitter = ((step * 7 + line_index * 3) % 5) - 2
+                            points.append((px, baseline + dy + jitter * 0.35))
+                        draw.line(points, fill=pencil_rgb + (alpha,), width=max(1, font_size // 25))
+                x += span_width
             y += main_height + line_spacing
 
         if comment_lines:

@@ -8,7 +8,7 @@ Photographed Korean book page → painted mask region only → editable OCR text
 
 - **마스크 영역 한국어 OCR** — crops and recognizes only the painted mask region.
 - **OCR 텍스트 수정** — automatically fills an editable multiline widget after OCR; user corrections are preserved.
-- **책 문장 꾸미기 → 이미지** — renders highlighter, colored-pencil underline, and a smaller red handwritten comment.
+- **책 문장 꾸미기 → 이미지** — renders Markdown-like italic, highlighter, colored-pencil underline, and footnote comments.
 - **한국어 OCR / 한국어 텍스트 → 이미지** — simpler reusable OCR and text rendering nodes.
 
 ## Install
@@ -33,6 +33,18 @@ Restart ComfyUI. Load `korean_ocr_to_image.workflow.json` from this repository o
 5. Correct OCR mistakes and line breaks. Add a short comment in the renderer.
 6. Queue again to render and save the annotated quote image.
 
+## Inline style syntax
+
+```markdown
+__colored-pencil underline__[^1]
+*synthetic italic*
+~~highlighter~~
+
+[^1]: A smaller red handwritten comment attached to the underlined phrase.
+```
+
+각주 문법은 `__밑줄__[^id]`와 `[^id]: 코멘트`를 함께 사용합니다. Footnote definitions are removed from the main body and rendered below it in smaller red handwriting.
+
 For a flat page, keep `document_unwarp=false`. Enable it for a visibly curved page. If the mask direction is reversed, enable `invert_mask`.
 
 See [README.ko.md](README.ko.md) for detailed Korean instructions and [UTILITY_NODES.md](UTILITY_NODES.md) for optional companion node packs.
@@ -47,4 +59,3 @@ See [README.ko.md](README.ko.md) for detailed Korean instructions and [UTILITY_N
 ## License
 
 MIT
-
