@@ -208,20 +208,21 @@ class KoreanOCRAutoCorrect:
                 "모델": ("STRING", {"default": "qwen3:8b"}),
                 "교정_강도": (["보수적", "일반"], {"default": "보수적"}),
                 "고유명사_보존": ("BOOLEAN", {"default": True}),
+                "꾸밈_선택": (["자동 추천 사용", "추천 없이 교정만"], {"default": "자동 추천 사용"}),
                 "올라마_주소": ("STRING", {"default": "http://127.0.0.1:11434"}),
                 "제한_시간_초": ("INT", {"default": 180, "min": 10, "max": 1800}),
             }
         }
 
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("교정_텍스트",)
+    RETURN_TYPES = ("STRING", "STRING", "STRING")
+    RETURN_NAMES = ("선택_텍스트", "교정_텍스트", "꾸밈_추천_텍스트")
     FUNCTION = "교정"
     CATEGORY = "한국어 OCR"
 
     def 교정(self, OCR_텍스트, 자동_교정, 모델, 교정_강도, 고유명사_보존,
-             올라마_주소, 제한_시간_초):
+             꾸밈_선택, 올라마_주소, 제한_시간_초):
         if not 자동_교정 or not OCR_텍스트.strip():
-            return (OCR_텍스트,)
+            return (OCR_텍스트, OCR_텍스트, OCR_텍스트)
 
         strength = (
             "명백한 OCR 오인식, 띄어쓰기, 문장부호만 고치고 문체와 어휘는 바꾸지 마라."
@@ -236,13 +237,23 @@ class KoreanOCRAutoCorrect:
             "다음은 한국어 소설책 사진에서 추출한 OCR 텍스트다.\n"
             f"{strength}\n{proper_nouns}\n"
             "문단과 줄바꿈을 가능한 한 보존하고, 내용을 추가·요약·번역하지 마라. "
-            "출력은 corrected_text 필드만 가진 JSON 객체여야 한다.\n\n"
+            "corrected_text에는 Markdown 없는 순수 교정문을 넣어라. "
+            "recommended_markdown에는 교정문 내용은 그대로 두고 아래 꾸밈 기호만 삽입해라.\n"
+            "- 핵심 문장이나 구절 1~2곳: __색연필 밑줄__\n"
+            "- 내면 독백이나 약한 강조 0~1곳: *이탤릭*\n"
+            "- 기억할 표현 0~2곳: ~~형광펜~~\n"
+            "- 밑줄에 짧은 감상 댓글이 어울리면 __구절__[^1]과 [^1]: 댓글 형식을 사용\n"
+            "과하게 꾸미지 말고, 코드 블록이나 다른 Markdown 문법은 쓰지 마라.\n"
+            "출력은 corrected_text와 recommended_markdown 필드를 가진 JSON 객체여야 한다.\n\n"
             f"OCR 원문:\n{OCR_텍스트}"
         )
         schema = {
             "type": "object",
-            "properties": {"corrected_text": {"type": "string"}},
-            "required": ["corrected_text"],
+            "properties": {
+                "corrected_text": {"type": "string"},
+                "recommended_markdown": {"type": "string"},
+            },
+            "required": ["corrected_text", "recommended_markdown"],
         }
         payload = json.dumps({
             "model": 모델.strip() or "qwen3:8b",
@@ -261,7 +272,9 @@ class KoreanOCRAutoCorrect:
         try:
             with urllib.request.urlopen(request, timeout=제한_시간_초) as response:
                 result = json.loads(response.read().decode("utf-8"))
-            corrected = json.loads(result.get("response", "{}"))["corrected_text"]
+            generated = json.loads(result.get("response", "{}"))
+            corrected = generated["corrected_text"].strip() or OCR_텍스트
+            recommended = generated["recommended_markdown"].strip() or corrected
         except urllib.error.URLError as exc:
             raise RuntimeError(
                 "로컬 AI(Ollama)에 연결하지 못했습니다. Ollama가 실행 중인지 확인하세요: "
@@ -269,7 +282,8 @@ class KoreanOCRAutoCorrect:
             ) from exc
         except (json.JSONDecodeError, KeyError, TypeError) as exc:
             raise RuntimeError("로컬 AI 교정 결과를 읽지 못했습니다. 다시 실행해 주세요.") from exc
-        return (corrected.strip() or OCR_텍스트,)
+        selected = recommended if 꾸밈_선택 == "자동 추천 사용" else corrected
+        return (selected, corrected, recommended)
 
 
 _FONT_LABELS = ["자동 (맑은 고딕)", "맑은 고딕", "맑은 고딕 굵게", "맑은 고딕 가늘게",
@@ -729,7 +743,7 @@ NODE_CLASS_MAPPINGS = {
 NODE_DISPLAY_NAME_MAPPINGS = {
     "KoreanOCR": "한국어 OCR (PaddleOCR)",
     "KoreanMaskedOCR": "마스크 영역 한국어 OCR",
-    "KoreanOCRAutoCorrect": "로컬 AI OCR 자동 교정",
+    "KoreanOCRAutoCorrect": "로컬 AI OCR 교정 + 꾸밈 추천",
     "KoreanTextStyleSettings": "글꼴·색상·크기 설정 + 미리보기",
     "KoreanEditableText": "OCR 텍스트 수정 → 이미지",
     "KoreanTextToImage": "한국어 텍스트 → 이미지",
