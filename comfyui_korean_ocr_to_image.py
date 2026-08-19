@@ -13,6 +13,7 @@ import json
 import urllib.error
 import urllib.request
 from functools import lru_cache
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -198,6 +199,59 @@ class KoreanMaskedOCR(KoreanOCR):
             tensor, OCR_버전, 회전_감지, 문서_펴기, 책_사진_보정
         )[0]
         return (text, tensor)
+
+
+_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
+
+
+def _comfy_directory(kind: str) -> Path:
+    """Return a ComfyUI data directory without requiring ComfyUI during tests."""
+    try:
+        import folder_paths
+
+        getters = {
+            "input": folder_paths.get_input_directory,
+            "output": folder_paths.get_output_directory,
+        }
+        return Path(getters[kind]()).resolve()
+    except (ImportError, AttributeError, KeyError):
+        return (Path.cwd() / kind).resolve()
+
+
+def _resolve_batch_folder(value: str, kind: str, create: bool = False) -> Path:
+    cleaned = os.path.expandvars(os.path.expanduser(value.strip().strip('"')))
+    if not cleaned:
+        raise ValueError("폴더 이름을 입력하세요.")
+    folder = Path(cleaned)
+    if not folder.is_absolute():
+        folder = _comfy_directory(kind) / folder
+    folder = folder.resolve()
+    if create:
+        folder.mkdir(parents=True, exist_ok=True)
+    return folder
+
+
+def _batch_files(folder: Path, extensions: set[str]):
+    return sorted(
+        (path for path in folder.rglob("*") if path.is_file() and path.suffix.lower() in extensions),
+        key=lambda path: str(path.relative_to(folder)).casefold(),
+    )
+
+
+def _atomic_write_text(path: Path, text: str):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_text(text, encoding="utf-8")
+    os.replace(temporary, path)
+
+
+def _batch_target(source: Path, source_root: Path, output_root: Path, suffix: str, claimed: set[Path]):
+    relative = source.relative_to(source_root)
+    target = (output_root / relative).with_suffix(suffix)
+    if target in claimed:
+        target = target.with_name(f"{target.stem}_{source.suffix[1:].lower()}{suffix}")
+    claimed.add(target)
+    return target
 
 
 class KoreanOCRAutoCorrect:
@@ -765,6 +819,168 @@ class KoreanBookTextToImage:
         return (torch.from_numpy(array).unsqueeze(0),)
 
 
+class KoreanBatchImagesToText:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "실행": ("BOOLEAN", {"default": True}),
+                "사진_폴더": ("STRING", {"default": "대량_OCR_사진"}),
+                "텍스트_저장_폴더": ("STRING", {"default": "korean_book_ocr/text"}),
+                "기존_텍스트_보호": ("BOOLEAN", {"default": True}),
+                "문서_펴기": ("BOOLEAN", {"default": False}),
+                "자동_맞춤법_교정": ("BOOLEAN", {"default": True}),
+            }
+        }
+
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("작업_결과",)
+    FUNCTION = "process_folder"
+    CATEGORY = "한국어 OCR/대량 작업"
+    OUTPUT_NODE = True
+
+    @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        return float("nan")
+
+    def process_folder(self, 실행, 사진_폴더, 텍스트_저장_폴더, 기존_텍스트_보호,
+                       문서_펴기, 자동_맞춤법_교정):
+        input_folder = _resolve_batch_folder(사진_폴더, "input", create=True)
+        output_folder = _resolve_batch_folder(텍스트_저장_폴더, "output", create=True)
+        if not 실행:
+            summary = "1단계가 꺼져 있습니다. 사진 OCR을 시작하려면 실행을 켜세요."
+            return {"ui": {"text": [summary]}, "result": (summary,)}
+
+        sources = _batch_files(input_folder, _IMAGE_EXTENSIONS)
+        if not sources:
+            summary = f"사진이 없습니다. 이 폴더에 사진을 넣으세요:\n{input_folder}"
+            return {"ui": {"text": [summary]}, "result": (summary,)}
+
+        ocr_node = KoreanOCR()
+        correction_node = KoreanOCRAutoCorrect()
+        claimed = set()
+        completed, skipped, warnings, errors = [], [], [], []
+        for source in sources:
+            target = _batch_target(source, input_folder, output_folder, ".txt", claimed)
+            if 기존_텍스트_보호 and target.exists():
+                skipped.append(target)
+                continue
+            try:
+                with Image.open(source) as opened:
+                    rgb = np.asarray(opened.convert("RGB"), dtype=np.float32) / 255.0
+                tensor = torch.from_numpy(rgb).unsqueeze(0)
+                raw_text = ocr_node.recognize(
+                    tensor, "PP-OCRv5", True, 문서_펴기, True,
+                )[0]
+                final_text = raw_text
+                if 자동_맞춤법_교정 and raw_text.strip():
+                    try:
+                        final_text = correction_node.교정(
+                            raw_text, True, "qwen3:8b", "정밀", True,
+                            "http://127.0.0.1:11434", 180,
+                        )[0]
+                    except Exception as exc:
+                        warnings.append(f"{source.name}: AI 교정을 건너뛰고 OCR 원문 저장 ({exc})")
+                _atomic_write_text(target, final_text.rstrip() + "\n")
+                completed.append(target)
+            except Exception as exc:
+                errors.append(f"{source.name}: {exc}")
+
+        lines = [
+            f"사진 {len(sources)}개 확인",
+            f"텍스트 {len(completed)}개 생성",
+            f"기존 파일 {len(skipped)}개 보호",
+            f"AI 교정 경고 {len(warnings)}개",
+            f"오류 {len(errors)}개",
+            f"저장 위치: {output_folder}",
+        ]
+        if warnings:
+            lines.extend(["", "경고 목록:", *warnings])
+        if errors:
+            lines.extend(["", "오류 목록:", *errors])
+        summary = "\n".join(lines)
+        return {"ui": {"text": [summary]}, "result": (summary,)}
+
+
+class KoreanBatchTextToImages:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "스타일_설정": ("KOREAN_TEXT_STYLE", {"forceInput": True}),
+                "실행": ("BOOLEAN", {"default": False}),
+                "텍스트_폴더": ("STRING", {"default": "korean_book_ocr/text"}),
+                "이미지_저장_폴더": ("STRING", {"default": "korean_book_ocr/images"}),
+                "기존_이미지_덮어쓰기": ("BOOLEAN", {"default": True}),
+            }
+        }
+
+    RETURN_TYPES = ("STRING", "IMAGE")
+    RETURN_NAMES = ("작업_결과", "마지막_이미지")
+    FUNCTION = "render_folder"
+    CATEGORY = "한국어 OCR/대량 작업"
+    OUTPUT_NODE = True
+
+    @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        return float("nan")
+
+    @staticmethod
+    def _blank_preview(style):
+        color = ImageColor.getrgb(style["background_color"])
+        image = np.full((128, 256, 3), color, dtype=np.uint8)
+        return torch.from_numpy(image.astype(np.float32) / 255.0).unsqueeze(0)
+
+    def render_folder(self, 스타일_설정, 실행, 텍스트_폴더, 이미지_저장_폴더,
+                      기존_이미지_덮어쓰기):
+        input_folder = _resolve_batch_folder(텍스트_폴더, "output", create=True)
+        output_folder = _resolve_batch_folder(이미지_저장_폴더, "output", create=True)
+        preview = self._blank_preview(스타일_설정)
+        if not 실행:
+            summary = "2단계가 꺼져 있습니다. 텍스트 수정을 마친 뒤 실행을 켜세요."
+            return {"ui": {"text": [summary]}, "result": (summary, preview)}
+
+        sources = _batch_files(input_folder, {".txt"})
+        if not sources:
+            summary = f"텍스트 파일이 없습니다. 먼저 1단계를 실행하세요:\n{input_folder}"
+            return {"ui": {"text": [summary]}, "result": (summary, preview)}
+
+        renderer = KoreanBookTextToImage()
+        style = 스타일_설정
+        claimed = set()
+        completed, skipped, errors = [], [], []
+        for source in sources:
+            target = _batch_target(source, input_folder, output_folder, ".png", claimed)
+            if not 기존_이미지_덮어쓰기 and target.exists():
+                skipped.append(target)
+                continue
+            try:
+                text = source.read_text(encoding="utf-8-sig")
+                preview = renderer.render_book_page(
+                    text, "", style["width"], style["font_size"],
+                    style["comment_font_size"], style["padding"], style["line_spacing"],
+                    style["font_path"], style["comment_font_path"], style["text_color"],
+                    style["pencil_color"], style["highlight_color"], style["background_color"],
+                )[0]
+                target.parent.mkdir(parents=True, exist_ok=True)
+                Image.fromarray(_tensor_to_rgb(preview)).save(target, format="PNG")
+                completed.append(target)
+            except Exception as exc:
+                errors.append(f"{source.name}: {exc}")
+
+        lines = [
+            f"텍스트 {len(sources)}개 확인",
+            f"이미지 {len(completed)}개 생성",
+            f"기존 이미지 {len(skipped)}개 건너뜀",
+            f"오류 {len(errors)}개",
+            f"저장 위치: {output_folder}",
+        ]
+        if errors:
+            lines.extend(["", "오류 목록:", *errors])
+        summary = "\n".join(lines)
+        return {"ui": {"text": [summary]}, "result": (summary, preview)}
+
+
 NODE_CLASS_MAPPINGS = {
     "KoreanOCR": KoreanOCR,
     "KoreanMaskedOCR": KoreanMaskedOCR,
@@ -772,6 +988,8 @@ NODE_CLASS_MAPPINGS = {
     "KoreanTextStyleSettings": KoreanTextStyleSettings,
     "KoreanEditableText": KoreanEditableText,
     "KoreanTextToImage": KoreanTextToImage,
+    "KoreanBatchImagesToText": KoreanBatchImagesToText,
+    "KoreanBatchTextToImages": KoreanBatchTextToImages,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -781,6 +999,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "KoreanTextStyleSettings": "글꼴·색상·크기 설정 + 미리보기",
     "KoreanEditableText": "OCR 텍스트 수정 → 이미지",
     "KoreanTextToImage": "한국어 텍스트 → 이미지",
+    "KoreanBatchImagesToText": "① 사진 폴더 → OCR 텍스트 파일",
+    "KoreanBatchTextToImages": "② 텍스트 폴더 → 파일별 이미지",
 }
 
 WEB_DIRECTORY = "./comfyui_korean_ocr_web"

@@ -44,7 +44,7 @@ ComfyUI/
 
 - Desktop의 `.venv` 또는 portable의 `python_embeded` 탐색
 - ComfyUI가 실제 사용하는 Python에 PaddleOCR 설치
-- `user/default/workflows`에 기본 워크플로우 복사
+- `user/default/workflows`에 단일 작업과 대량 작업 워크플로우 복사
 - 설치된 Ollama와 Qwen 모델 확인
 
 ## 4. Qwen 오타·맞춤법 교정 사용하기
@@ -56,7 +56,7 @@ AI 교정이 필요 없으면 워크플로우에서 `자동_교정`을 끄세요
 ## 5. ComfyUI에서 열기
 
 1. ComfyUI를 완전히 종료했다가 다시 실행합니다.
-2. 워크플로우 메뉴에서 `korean_ocr_to_image`를 엽니다.
+2. 한 장씩 작업하려면 `korean_ocr_to_image`, 폴더 단위로 작업하려면 `korean_ocr_batch`를 엽니다.
 3. 메뉴에 없다면 저장소의 `korean_ocr_to_image.workflow.json`을 화면으로 끌어다 놓습니다.
 4. 아래 노드가 보이면 설치가 완료된 것입니다.
    - `마스크 영역 한국어 OCR`

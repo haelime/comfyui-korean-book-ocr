@@ -20,6 +20,15 @@
 
 자세한 내용: [Windows 설치 가이드](docs/INSTALL.ko.md)
 
+## 여러 사진 한꺼번에 처리
+
+1. `ComfyUI/input/대량_OCR_사진`에 사진을 넣습니다.
+2. `korean_ocr_batch` 워크플로우를 열고 ① 단계를 실행합니다.
+3. `ComfyUI/output/korean_book_ocr/text`의 TXT를 직접 수정합니다.
+4. ② 단계를 실행하면 TXT마다 PNG 한 장이 `output/korean_book_ocr/images`에 저장됩니다.
+
+기존 TXT는 기본적으로 덮어쓰지 않으므로 수정 내용이 보호됩니다.
+
 ## 사용법
 
 1. `Load Image`에서 책 사진을 선택합니다.
