@@ -200,55 +200,6 @@ class KoreanMaskedOCR(KoreanOCR):
         return (text, tensor)
 
 
-def _markdown_preserves_source(markdown_text, source_text):
-    definitions = {
-        match.group(1)
-        for line in markdown_text.splitlines()
-        if (match := re.match(r"^\[\^([^\]]+)\]:", line))
-    }
-    body_lines = [
-        line for line in markdown_text.splitlines()
-        if not re.match(r"^\[\^[^\]]+\]:", line)
-    ]
-    body = "\n".join(body_lines)
-    references = set(re.findall(r"\[\^([^\]]+)\]", body))
-    if references != definitions:
-        return False
-    has_style = bool(
-        re.search(r"__.+?__", body, re.DOTALL)
-        or re.search(r"~~.+?~~", body, re.DOTALL)
-        or re.search(r"(?<!\*)\*(?!\*).+?(?<!\*)\*(?!\*)", body, re.DOTALL)
-    )
-    if not has_style:
-        return False
-    body = re.sub(r"\[\^[^\]]+\]", "", body)
-    body = body.replace("__", "").replace("~~", "").replace("*", "")
-    normalize = lambda value: re.sub(r"\s+", " ", value).strip()
-    return normalize(body) == normalize(source_text)
-
-
-def _sanitize_markdown_recommendation(markdown_text):
-    lines = markdown_text.splitlines()
-    body_lines = [line for line in lines if not re.match(r"^\[\^[^\]]+\]:", line)]
-    definitions = {}
-    for line in lines:
-        match = re.match(r"^\[\^([^\]]+)\]:\s*(.*)$", line)
-        if match:
-            definitions[match.group(1)] = match.group(2)
-    body = "\n".join(body_lines)
-    reference_order = list(dict.fromkeys(re.findall(r"\[\^([^\]]+)\]", body)))
-    references = set(reference_order)
-    for missing in references - definitions.keys():
-        body = body.replace(f"[^{missing}]", "")
-    kept_definitions = [
-        f"[^{ref_id}]: {definitions[ref_id]}"
-        for ref_id in reference_order
-        if ref_id in definitions
-    ]
-    body = body.strip()
-    return body + (("\n\n" + "\n".join(kept_definitions)) if kept_definitions else "")
-
-
 class KoreanOCRAutoCorrect:
     @classmethod
     def INPUT_TYPES(cls):
@@ -264,15 +215,15 @@ class KoreanOCRAutoCorrect:
             }
         }
 
-    RETURN_TYPES = ("STRING", "STRING", "STRING")
-    RETURN_NAMES = ("꾸밈_추천_텍스트", "교정_텍스트", "OCR_원문")
+    RETURN_TYPES = ("STRING", "STRING")
+    RETURN_NAMES = ("교정_텍스트", "OCR_원문")
     FUNCTION = "교정"
     CATEGORY = "한국어 OCR"
 
     def 교정(self, OCR_텍스트, 자동_교정, 모델, 교정_강도, 고유명사_보존,
              올라마_주소, 제한_시간_초):
         if not 자동_교정 or not OCR_텍스트.strip():
-            return (OCR_텍스트, OCR_텍스트, OCR_텍스트)
+            return (OCR_텍스트, OCR_텍스트)
 
         if 교정_강도 == "정밀":
             strength = (
@@ -337,39 +288,6 @@ class KoreanOCRAutoCorrect:
                 reviewed = request_json(review_prompt, correction_schema)["corrected_text"].strip()
                 corrected = reviewed or corrected
 
-            decoration_prompt = (
-                "다음 한국어 교정문의 글자는 고치거나 추가하거나 삭제하지 말고, "
-                "아래 꾸밈 기호만 적절한 위치에 삽입해 recommended_markdown으로 출력하라.\n"
-                "- 최소 한 곳은 반드시 밑줄로 추천하라. 밑줄은 선택한 실제 구절 앞뒤에 __를 붙인다.\n"
-                "- 내면 독백 0~1곳은 선택한 실제 구절 앞뒤에 *를 붙인다.\n"
-                "- 기억할 표현 0~2곳은 선택한 실제 구절 앞뒤에 ~~를 붙인다.\n"
-                "- 댓글은 밑줄 바로 뒤에 [^1]을 붙이고, 본문이 끝난 다음 새 줄에 [^1]: 댓글로 써라.\n"
-                "형식 예시: 입력이 '바람이 분다.'라면 출력은 '__바람이 분다.__'처럼 쓴다. "
-                "예시의 '바람이 분다.'는 실제 출력에 복사하지 마라. "
-                "꾸밈 기호와 별도 각주 정의를 제외한 본문 글자는 교정문과 완전히 같아야 한다.\n"
-                "과하게 꾸미지 말고, 코드 블록이나 다른 Markdown 문법은 쓰지 마라. "
-                "모든 여는 꾸밈 기호는 줄이 바뀌더라도 반드시 같은 종류의 닫는 기호와 짝을 맞춰라.\n\n"
-                f"교정문:\n{corrected}"
-            )
-            decoration_schema = {
-                "type": "object",
-                "properties": {"recommended_markdown": {"type": "string"}},
-                "required": ["recommended_markdown"],
-            }
-            recommended = _sanitize_markdown_recommendation(
-                request_json(decoration_prompt, decoration_schema)["recommended_markdown"].strip()
-            )
-            if recommended and not _markdown_preserves_source(recommended, corrected):
-                retry_prompt = (
-                    decoration_prompt
-                    + "\n\n이전 응답은 교정문에 없는 글자를 본문에 추가해 실패했다. "
-                      "이번에는 교정문에 실제로 존재하는 구절만 기호로 감싸고 본문을 정확히 보존하라."
-                )
-                recommended = _sanitize_markdown_recommendation(
-                    request_json(retry_prompt, decoration_schema)["recommended_markdown"].strip()
-                )
-            if not recommended or not _markdown_preserves_source(recommended, corrected):
-                recommended = corrected
         except urllib.error.URLError as exc:
             raise RuntimeError(
                 "로컬 AI(Ollama)에 연결하지 못했습니다. Ollama가 실행 중인지 확인하세요: "
@@ -377,7 +295,7 @@ class KoreanOCRAutoCorrect:
             ) from exc
         except (json.JSONDecodeError, KeyError, TypeError) as exc:
             raise RuntimeError("로컬 AI 교정 결과를 읽지 못했습니다. 다시 실행해 주세요.") from exc
-        return (recommended, corrected, OCR_텍스트)
+        return (corrected, OCR_텍스트)
 
 
 _FONT_LABELS = ["자동 (맑은 고딕)", "맑은 고딕", "맑은 고딕 굵게", "맑은 고딕 가늘게",
@@ -445,7 +363,7 @@ class KoreanTextStyleSettings:
         }
         sample = (
             "글꼴과 크기 미리보기\n"
-            "__붉은 색연필 밑줄__[^1]  *이탤릭*  ~~형광펜~~\n\n"
+            "__붉은 색연필 밑줄__[^1]  **굵게**  *이탤릭*  ~~형광펜~~\n\n"
             "[^1]: 작은 붉은 글씨 댓글"
         )
         image = KoreanBookTextToImage().render_book_page(
@@ -547,7 +465,7 @@ def _parse_inline_markdown(line: str):
     """Parse the deliberately small Markdown subset used by the renderer."""
     tokens = []
     index = 0
-    markers = (("__", "underline"), ("~~", "highlight"), ("*", "italic"))
+    markers = (("**", "bold"), ("__", "underline"), ("~~", "highlight"), ("*", "italic"))
     while index < len(line):
         ref = re.match(r"\[\^([^\]]+)\]", line[index:])
         if ref:
@@ -813,6 +731,11 @@ class KoreanBookTextToImage:
                     )
                 if style == "italic":
                     _draw_italic_text(canvas, (x, y), value, font, text_fill)
+                elif style == "bold":
+                    draw.text(
+                        (x, y), value, font=font, fill=text_fill,
+                        stroke_width=max(1, font_size // 32), stroke_fill=text_fill,
+                    )
                 else:
                     draw.text((x, y), value, font=font, fill=text_fill)
                 if style == "underline" and value:
@@ -854,7 +777,7 @@ NODE_CLASS_MAPPINGS = {
 NODE_DISPLAY_NAME_MAPPINGS = {
     "KoreanOCR": "한국어 OCR (PaddleOCR)",
     "KoreanMaskedOCR": "마스크 영역 한국어 OCR",
-    "KoreanOCRAutoCorrect": "로컬 AI OCR 교정 + 꾸밈 추천",
+    "KoreanOCRAutoCorrect": "로컬 AI OCR 오타·맞춤법 교정",
     "KoreanTextStyleSettings": "글꼴·색상·크기 설정 + 미리보기",
     "KoreanEditableText": "OCR 텍스트 수정 → 이미지",
     "KoreanTextToImage": "한국어 텍스트 → 이미지",

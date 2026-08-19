@@ -13,6 +13,7 @@ class MultilineMarkdownTests(unittest.TestCase):
     def test_each_supported_style_can_cross_a_source_line(self):
         cases = {
             "underline": "__첫 줄\n둘째 줄__",
+            "bold": "**첫 줄\n둘째 줄**",
             "italic": "*첫 줄\n둘째 줄*",
             "highlight": "~~첫 줄\n둘째 줄~~",
         }

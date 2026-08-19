@@ -9,7 +9,7 @@
       "size": [1630, 280],
       "flags": {}, "order": 9, "mode": 0,
       "inputs": [], "outputs": [], "properties": {},
-      "widgets_values": ["사용법\n1. Load Image에서 책 사진 선택\n2. 일부만 OCR하려면 우클릭 → Open in Mask Editor에서 흰색으로 칠하기 (마스크가 비어 있으면 사진 전체 OCR)\n3. ‘로컬 AI OCR 교정 + 꾸밈 추천’이 2차 오타 검수 후 Markdown 꾸밈 추천\n4. ‘OCR 텍스트 수정 → 이미지’에서 추천 결과를 확인하고 직접 수정한 뒤 Queue 재실행\n5. 글꼴·색상·크기는 ‘글꼴·색상·크기 설정 + 미리보기’에서 변경\n\n__붉은 색연필 밑줄__[^1]    *이탤릭*    ~~형광펜~~\n[^1]: 밑줄에 연결할 붉은 손글씨 댓글\n꾸밈 기호는 여러 줄에 걸쳐 사용해도 됩니다.\n\nAI를 쓰지 않으려면 자동_교정을 끄세요. 수정 내용을 추천본으로 되돌리려면 ‘AI 추천본으로 재설정’ 버튼을 누르세요."],
+      "widgets_values": ["사용법\n1. Load Image에서 책 사진 선택\n2. 일부만 OCR하려면 우클릭 → Open in Mask Editor에서 흰색으로 칠하기 (마스크가 비어 있으면 사진 전체 OCR)\n3. ‘로컬 AI OCR 오타·맞춤법 교정’이 글자와 문맥을 두 차례 검수\n4. ‘OCR 텍스트 수정 → 이미지’에서 교정 결과를 확인하고 원하는 부분을 직접 꾸민 뒤 Queue 재실행\n5. 글꼴·색상·크기는 ‘글꼴·색상·크기 설정 + 미리보기’에서 변경\n\n__붉은 색연필 밑줄__[^1]    **굵게**    *이탤릭*    ~~형광펜~~\n[^1]: 밑줄에 연결할 붉은 손글씨 댓글\n꾸밈 기호는 여러 줄에 걸쳐 사용해도 됩니다.\n\nAI를 쓰지 않으려면 자동_교정을 끄세요. 수정 내용을 교정본으로 되돌리려면 ‘AI 교정본으로 재설정’ 버튼을 누르세요."],
       "color": "#2a363b", "bgcolor": "#3f5158"
     },
     {
@@ -51,9 +51,8 @@
       "flags": {}, "order": 2, "mode": 0,
       "inputs": [{"name": "OCR_텍스트", "type": "STRING", "link": 3}],
       "outputs": [
-        {"name": "꾸밈_추천_텍스트", "type": "STRING", "links": [8], "slot_index": 0},
-        {"name": "교정_텍스트", "type": "STRING", "links": null, "slot_index": 1},
-        {"name": "OCR_원문", "type": "STRING", "links": null, "slot_index": 2}
+        {"name": "교정_텍스트", "type": "STRING", "links": [8], "slot_index": 0},
+        {"name": "OCR_원문", "type": "STRING", "links": null, "slot_index": 1}
       ],
       "properties": {"Node name for S&R": "KoreanOCRAutoCorrect"},
       "widgets_values": [true, "qwen3:8b", "정밀", true, "http://127.0.0.1:11434", 180]

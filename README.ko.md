@@ -5,31 +5,20 @@
 ## 문서 바로가기
 
 - [처음부터 따라 하는 Windows 설치 가이드](docs/INSTALL.ko.md)
-- [워크플로우와 Qwen 추천 선택 사용법](docs/WORKFLOW.ko.md)
+- [워크플로우 사용법과 수동 꾸밈 문법](docs/WORKFLOW.ko.md)
 - [함께 쓰기 좋은 유틸리티 노드](UTILITY_NODES.md)
 
 ## 설치
 
-1. `comfyui_korean_ocr_to_image.py`와 `comfyui_korean_ocr_web` 폴더를 `ComfyUI/custom_nodes/`에 복사합니다.
-2. ComfyUI가 사용하는 Python에 PaddleOCR를 설치합니다.
+`uv`는 필요하지 않습니다. 이 노드는 ComfyUI의 Python과 `pip`만 사용합니다.
 
-일반 설치판:
+1. ComfyUI를 완전히 종료합니다.
+2. GitHub의 **Code → Download ZIP**을 눌러 압축을 풉니다.
+3. 압축을 푼 폴더를 `ComfyUI/custom_nodes/` 안에 넣습니다.
+4. 폴더 안의 `install_windows.bat`을 더블클릭합니다.
+5. 설치 완료 문구가 나오면 ComfyUI를 다시 실행하고 워크플로우 메뉴에서 `korean_ocr_to_image`를 엽니다.
 
-```powershell
-cd C:\경로\ComfyUI
-python -m pip install paddlepaddle paddleocr
-```
-
-Windows portable판:
-
-```powershell
-cd C:\경로\ComfyUI_windows_portable
-.\python_embeded\python.exe -m pip install paddlepaddle paddleocr
-```
-
-3. ComfyUI를 완전히 재시작합니다.
-4. `korean_ocr_to_image.workflow.json`을 ComfyUI 화면에 드래그하거나 `Ctrl+O`로 엽니다.
-5. `Load Image`에서 실제 이미지를 선택하고 Queue를 실행합니다. 첫 실행 때 한국어 OCR 모델을 내려받으므로 시간이 걸릴 수 있습니다.
+설치 파일이 ComfyUI 전용 Python을 자동으로 찾아 PaddleOCR를 설치하고 워크플로우도 복사합니다. 자세한 폴더 예시와 오류 해결은 [처음부터 따라 하는 Windows 설치 가이드](docs/INSTALL.ko.md)를 보세요.
 
 ## 로컬 AI 자동 교정 설치
 
@@ -39,21 +28,22 @@ Ollama를 설치하고 다음 모델을 한 번 내려받습니다. 모든 교�
 ollama pull qwen3:8b
 ```
 
-워크플로우의 `로컬 AI OCR 교정 + 꾸밈 추천` 노드는 글자를 두 차례 검산하는 `정밀` 모드로 오타를 교정한 뒤 Markdown 꾸밈 추천문을 만듭니다. 추천문이 기본적으로 편집 노드에 연결되며, `교정_텍스트`와 `OCR_원문` 출력도 별도로 제공합니다. AI를 사용하지 않을 때는 `자동_교정`을 끄면 OCR 원문을 그대로 통과시킵니다.
+워크플로우의 `로컬 AI OCR 오타·맞춤법 교정` 노드는 글자를 두 차례 검산하는 `정밀` 모드로 오타와 맞춤법만 교정합니다. 꾸밈은 추천하거나 자동 삽입하지 않습니다. AI를 사용하지 않을 때는 `자동_교정`을 끄면 OCR 원문을 그대로 통과시킵니다.
 
 ## 마스크 → 수정 및 이미지 생성
 
 1. 책 전체를 OCR하려면 마스크를 칠하지 않고 진행합니다.
 2. 일부만 OCR하려면 `Load Image`를 우클릭해 `Open in Mask Editor`를 열고 해당 문단만 흰색으로 칠합니다.
-3. Queue를 한 번 실행하면 로컬 AI가 오인식을 교정하고 선택한 꾸밈 추천 여부에 따라 `OCR 텍스트 수정 → 이미지`의 편집 칸에 결과를 자동 입력합니다.
+3. Queue를 한 번 실행하면 로컬 AI가 오타와 맞춤법을 교정하고 `OCR 텍스트 수정 → 이미지`의 편집 칸에 결과를 자동 입력합니다.
 4. 같은 노드에서 오탈자·줄바꿈·Markdown 꾸밈·코멘트를 수정합니다.
 5. 다시 Queue하면 이 노드가 수정본을 바로 이미지로 만들어 저장합니다.
-6. 직접 수정한 내용을 Qwen 추천 결과로 되돌리려면 `AI 추천본으로 재설정` 버튼을 누릅니다.
+6. 직접 수정한 내용을 Qwen 교정 결과로 되돌리려면 `AI 교정본으로 재설정` 버튼을 누릅니다.
 
 꾸밀 부분은 다음 Markdown형 문법으로 지정합니다.
 
 ```markdown
 __이 부분은 색연필 밑줄__[^1]
+**이 부분은 굵게**
 *이 부분은 이탤릭*
 ~~이 부분은 형광펜~~
 
@@ -61,7 +51,7 @@ __이 부분은 색연필 밑줄__[^1]
 ```
 
 각주 정의는 본문에서 제거되고 이미지 아래에 더 작은 붉은 손글씨로 표시됩니다.
-여는 기호와 닫는 기호가 서로 다른 줄에 있어도 밑줄·이탤릭·형광펜 효과가 모든 줄에 이어집니다.
+여는 기호와 닫는 기호가 서로 다른 줄에 있어도 밑줄·굵게·이탤릭·형광펜 효과가 모든 줄에 이어집니다. 꾸밈 문법끼리는 중첩하지 마세요.
 
 ## 글꼴·색상·크기 설정과 미리보기
 
