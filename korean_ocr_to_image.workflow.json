@@ -1,7 +1,19 @@
 {
-  "last_node_id": 7,
+  "last_node_id": 8,
   "last_link_id": 7,
   "nodes": [
+    {
+      "id": 8,
+      "type": "Note",
+      "pos": [20, -260],
+      "size": [1150, 240],
+      "flags": {}, "order": 6, "mode": 0,
+      "inputs": [], "outputs": [],
+      "properties": {},
+      "widgets_values": ["사용법\n1. Load Image에서 책 사진을 선택하고 우클릭 → Open in Mask Editor\n2. OCR할 부분만 흰색으로 칠한 뒤 저장\n3. Queue 1회 → ‘OCR 텍스트 수정 → 이미지’에 OCR 결과가 자동 입력됨\n4. 같은 노드에서 글을 수정하고 아래 문법으로 꾸민 뒤 Queue 재실행\n\n__색연필 밑줄__[^1]    *이탤릭*    ~~형광펜~~\n[^1]: 밑줄에 연결할 붉은 손글씨 댓글\n\n새 OCR 결과로 되돌리기: ‘OCR 원문으로 재설정’ 버튼"],
+      "color": "#2a363b",
+      "bgcolor": "#3f5158"
+    },
     {
       "id": 1,
       "type": "LoadImage",
