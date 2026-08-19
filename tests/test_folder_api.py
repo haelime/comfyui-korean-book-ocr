@@ -14,6 +14,9 @@ class _Routes:
     def get(self, _path):
         return lambda function: function
 
+    def post(self, _path):
+        return lambda function: function
+
 
 class FolderApiTests(unittest.TestCase):
     def test_folder_list_is_relative_sorted_and_hides_dot_folders(self):
@@ -38,6 +41,23 @@ class FolderApiTests(unittest.TestCase):
             folders = module._relative_folders(base)
 
         self.assertEqual(folders, ["가", "나", "나/하위"])
+
+    def test_native_picker_endpoint_is_limited_to_local_requests(self):
+        fake_folder_paths = types.SimpleNamespace(
+            get_input_directory=lambda: "input",
+            get_output_directory=lambda: "output",
+        )
+        fake_server = types.SimpleNamespace(
+            PromptServer=types.SimpleNamespace(instance=types.SimpleNamespace(routes=_Routes()))
+        )
+        with patch.dict(sys.modules, {"folder_paths": fake_folder_paths, "server": fake_server}):
+            spec = importlib.util.spec_from_file_location("folder_api_local_test", ROOT / "folder_api.py")
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+
+        self.assertTrue(module._is_local_request(types.SimpleNamespace(remote="127.0.0.1")))
+        self.assertTrue(module._is_local_request(types.SimpleNamespace(remote="::1")))
+        self.assertFalse(module._is_local_request(types.SimpleNamespace(remote="192.168.0.10")))
 
 
 if __name__ == "__main__":

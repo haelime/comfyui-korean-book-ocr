@@ -68,6 +68,22 @@ async function pickComfyFolder(node, widgetName, kind, title) {
   const widget = node.widgets?.find((item) => item.name === widgetName);
   if (!widget) return;
   try {
+    const nativeResponse = await api.fetchApi(`/korean-book-ocr/pick-folder?kind=${kind}`, {
+      method: "POST",
+    });
+    if (nativeResponse.ok) {
+      const nativeData = await nativeResponse.json();
+      if (!nativeData.cancelled && nativeData.path) {
+        widget.value = nativeData.path;
+        app.graph.setDirtyCanvas(true, true);
+      }
+      return;
+    }
+    if (nativeResponse.status !== 501) {
+      const nativeError = await nativeResponse.json().catch(() => ({}));
+      throw new Error(nativeError.error || `HTTP ${nativeResponse.status}`);
+    }
+
     const response = await api.fetchApi(`/korean-book-ocr/folders?kind=${kind}`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
