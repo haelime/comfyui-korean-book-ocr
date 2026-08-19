@@ -9,8 +9,6 @@
 
 ## 설치
 
-`uv`, Git, 별도의 Python은 필요하지 않습니다.
-
 1. ComfyUI를 완전히 종료합니다.
 2. 위쪽의 **Code → Download ZIP**으로 파일을 받습니다.
 3. 압축을 푼 폴더를 `ComfyUI/custom_nodes/` 안에 넣습니다.
