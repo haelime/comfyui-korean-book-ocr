@@ -38,7 +38,7 @@ app.registerExtension({
     const originalCreated = nodeType.prototype.onNodeCreated;
     nodeType.prototype.onNodeCreated = function () {
       const result = originalCreated?.apply(this, arguments);
-      const resetButton = this.addWidget("button", "AI 선택본으로 재설정", null, () => {
+      const resetButton = this.addWidget("button", "AI 추천본으로 재설정", null, () => {
         const widget = this.widgets?.find((w) => w.name === "수정_텍스트");
         if (widget && typeof this._lastKoreanOCRText === "string") {
           widget.value = this._lastKoreanOCRText;

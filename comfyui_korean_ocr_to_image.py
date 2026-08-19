@@ -32,11 +32,13 @@ def _masked_crop(rgb: np.ndarray, mask: torch.Tensor, invert: bool, margin: int)
     mask_image = Image.fromarray((data.clip(0, 1) * 255).astype(np.uint8))
     mask_image = mask_image.resize((rgb.shape[1], rgb.shape[0]), Image.Resampling.BILINEAR)
     alpha = np.asarray(mask_image).astype(np.float32) / 255.0
+    if not (alpha > 0.05).any():
+        return rgb.copy()
     if invert:
         alpha = 1.0 - alpha
     selected = alpha > 0.05
     if not selected.any():
-        raise ValueError("마스크가 비어 있습니다. Mask Editor에서 OCR할 문단을 흰색으로 칠하세요.")
+        return rgb.copy()
     ys, xs = np.where(selected)
     left = max(0, int(xs.min()) - margin)
     top = max(0, int(ys.min()) - margin)
@@ -198,6 +200,55 @@ class KoreanMaskedOCR(KoreanOCR):
         return (text, tensor)
 
 
+def _markdown_preserves_source(markdown_text, source_text):
+    definitions = {
+        match.group(1)
+        for line in markdown_text.splitlines()
+        if (match := re.match(r"^\[\^([^\]]+)\]:", line))
+    }
+    body_lines = [
+        line for line in markdown_text.splitlines()
+        if not re.match(r"^\[\^[^\]]+\]:", line)
+    ]
+    body = "\n".join(body_lines)
+    references = set(re.findall(r"\[\^([^\]]+)\]", body))
+    if references != definitions:
+        return False
+    has_style = bool(
+        re.search(r"__.+?__", body, re.DOTALL)
+        or re.search(r"~~.+?~~", body, re.DOTALL)
+        or re.search(r"(?<!\*)\*(?!\*).+?(?<!\*)\*(?!\*)", body, re.DOTALL)
+    )
+    if not has_style:
+        return False
+    body = re.sub(r"\[\^[^\]]+\]", "", body)
+    body = body.replace("__", "").replace("~~", "").replace("*", "")
+    normalize = lambda value: re.sub(r"\s+", " ", value).strip()
+    return normalize(body) == normalize(source_text)
+
+
+def _sanitize_markdown_recommendation(markdown_text):
+    lines = markdown_text.splitlines()
+    body_lines = [line for line in lines if not re.match(r"^\[\^[^\]]+\]:", line)]
+    definitions = {}
+    for line in lines:
+        match = re.match(r"^\[\^([^\]]+)\]:\s*(.*)$", line)
+        if match:
+            definitions[match.group(1)] = match.group(2)
+    body = "\n".join(body_lines)
+    reference_order = list(dict.fromkeys(re.findall(r"\[\^([^\]]+)\]", body)))
+    references = set(reference_order)
+    for missing in references - definitions.keys():
+        body = body.replace(f"[^{missing}]", "")
+    kept_definitions = [
+        f"[^{ref_id}]: {definitions[ref_id]}"
+        for ref_id in reference_order
+        if ref_id in definitions
+    ]
+    body = body.strip()
+    return body + (("\n\n" + "\n".join(kept_definitions)) if kept_definitions else "")
+
+
 class KoreanOCRAutoCorrect:
     @classmethod
     def INPUT_TYPES(cls):
@@ -206,75 +257,119 @@ class KoreanOCRAutoCorrect:
                 "OCR_텍스트": ("STRING", {"forceInput": True}),
                 "자동_교정": ("BOOLEAN", {"default": True}),
                 "모델": ("STRING", {"default": "qwen3:8b"}),
-                "교정_강도": (["보수적", "일반"], {"default": "보수적"}),
+                "교정_강도": (["정밀", "보수적", "일반"], {"default": "정밀"}),
                 "고유명사_보존": ("BOOLEAN", {"default": True}),
-                "꾸밈_선택": (["자동 추천 사용", "추천 없이 교정만"], {"default": "자동 추천 사용"}),
                 "올라마_주소": ("STRING", {"default": "http://127.0.0.1:11434"}),
                 "제한_시간_초": ("INT", {"default": 180, "min": 10, "max": 1800}),
             }
         }
 
     RETURN_TYPES = ("STRING", "STRING", "STRING")
-    RETURN_NAMES = ("선택_텍스트", "교정_텍스트", "꾸밈_추천_텍스트")
+    RETURN_NAMES = ("꾸밈_추천_텍스트", "교정_텍스트", "OCR_원문")
     FUNCTION = "교정"
     CATEGORY = "한국어 OCR"
 
     def 교정(self, OCR_텍스트, 자동_교정, 모델, 교정_강도, 고유명사_보존,
-             꾸밈_선택, 올라마_주소, 제한_시간_초):
+             올라마_주소, 제한_시간_초):
         if not 자동_교정 or not OCR_텍스트.strip():
             return (OCR_텍스트, OCR_텍스트, OCR_텍스트)
 
-        strength = (
-            "명백한 OCR 오인식, 띄어쓰기, 문장부호만 고치고 문체와 어휘는 바꾸지 마라."
-            if 교정_강도 == "보수적"
-            else "OCR 오인식과 맞춤법을 고치되 원문의 의미와 문체를 유지하라."
-        )
+        if 교정_강도 == "정밀":
+            strength = (
+                "원문과 글자 단위로 대조해 음절 누락·중복, 비슷한 글자 오인식, 잘못된 받침과 "
+                "활용, 부사형 -이/-히, 띄어쓰기·문장부호·따옴표를 문맥으로 점검하라. "
+                "확실한 오타는 빠짐없이 고치되 "
+                "작가의 문체, 방언, 옛말, 의도적인 비문은 함부로 표준어로 바꾸지 마라."
+            )
+        elif 교정_강도 == "보수적":
+            strength = "명백한 OCR 오인식, 띄어쓰기, 문장부호만 고치고 문체와 어휘는 바꾸지 마라."
+        else:
+            strength = "OCR 오인식과 맞춤법을 고치되 원문의 의미와 문체를 유지하라."
         proper_nouns = (
             "사람 이름, 지명, 작품명 등 고유명사는 확실한 근거가 없으면 절대 바꾸지 마라."
             if 고유명사_보존 else "문맥상 명백히 잘못 인식된 고유명사는 교정해도 된다."
         )
-        prompt = (
+        correction_prompt = (
             "다음은 한국어 소설책 사진에서 추출한 OCR 텍스트다.\n"
             f"{strength}\n{proper_nouns}\n"
             "문단과 줄바꿈을 가능한 한 보존하고, 내용을 추가·요약·번역하지 마라. "
-            "corrected_text에는 Markdown 없는 순수 교정문을 넣어라. "
-            "recommended_markdown에는 교정문 내용은 그대로 두고 아래 꾸밈 기호만 삽입해라.\n"
-            "- 핵심 문장이나 구절 1~2곳: __색연필 밑줄__\n"
-            "- 내면 독백이나 약한 강조 0~1곳: *이탤릭*\n"
-            "- 기억할 표현 0~2곳: ~~형광펜~~\n"
-            "- 밑줄에 짧은 감상 댓글이 어울리면 __구절__[^1]과 [^1]: 댓글 형식을 사용\n"
-            "과하게 꾸미지 말고, 코드 블록이나 다른 Markdown 문법은 쓰지 마라.\n"
-            "출력은 corrected_text와 recommended_markdown 필드를 가진 JSON 객체여야 한다.\n\n"
+            "corrected_text에는 Markdown 없는 순수 교정문만 넣어라.\n\n"
             f"OCR 원문:\n{OCR_텍스트}"
         )
-        schema = {
+        correction_schema = {
             "type": "object",
-            "properties": {
-                "corrected_text": {"type": "string"},
-                "recommended_markdown": {"type": "string"},
-            },
-            "required": ["corrected_text", "recommended_markdown"],
+            "properties": {"corrected_text": {"type": "string"}},
+            "required": ["corrected_text"],
         }
-        payload = json.dumps({
-            "model": 모델.strip() or "qwen3:8b",
-            "prompt": prompt,
-            "stream": False,
-            "think": False,
-            "format": schema,
-            "options": {"temperature": 0.1},
-        }, ensure_ascii=False).encode("utf-8")
-        request = urllib.request.Request(
-            올라마_주소.rstrip("/") + "/api/generate",
-            data=payload,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        try:
+        model_name = 모델.strip() or "qwen3:8b"
+
+        def request_json(prompt, schema):
+            payload = json.dumps({
+                "model": model_name,
+                "prompt": prompt,
+                "stream": False,
+                "think": False,
+                "format": schema,
+                "options": {"temperature": 0},
+            }, ensure_ascii=False).encode("utf-8")
+            request = urllib.request.Request(
+                올라마_주소.rstrip("/") + "/api/generate",
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
             with urllib.request.urlopen(request, timeout=제한_시간_초) as response:
                 result = json.loads(response.read().decode("utf-8"))
-            generated = json.loads(result.get("response", "{}"))
-            corrected = generated["corrected_text"].strip() or OCR_텍스트
-            recommended = generated["recommended_markdown"].strip() or corrected
+            return json.loads(result.get("response", "{}"))
+
+        try:
+            corrected = request_json(correction_prompt, correction_schema)["corrected_text"].strip()
+            corrected = corrected or OCR_텍스트
+
+            if 교정_강도 == "정밀":
+                review_prompt = (
+                    "너는 두 번째 한국어 교정자다. 아래 문장은 1차 OCR 교정을 마친 결과다. "
+                    "독립 검수하여 남은 음절 누락·중복, 받침, 활용, 부사형 -이/-히, 띄어쓰기, "
+                    "문장부호 오류를 찾아라. 특히 자연스럽게 읽혀 지나치기 쉬운 오타도 문맥으로 "
+                    "확인하라. 내용과 문체는 바꾸지 말고 corrected_text JSON만 출력하라.\n\n"
+                    f"1차 교정문:\n{corrected}"
+                )
+                reviewed = request_json(review_prompt, correction_schema)["corrected_text"].strip()
+                corrected = reviewed or corrected
+
+            decoration_prompt = (
+                "다음 한국어 교정문의 글자는 고치거나 추가하거나 삭제하지 말고, "
+                "아래 꾸밈 기호만 적절한 위치에 삽입해 recommended_markdown으로 출력하라.\n"
+                "- 최소 한 곳은 반드시 밑줄로 추천하라. 밑줄은 선택한 실제 구절 앞뒤에 __를 붙인다.\n"
+                "- 내면 독백 0~1곳은 선택한 실제 구절 앞뒤에 *를 붙인다.\n"
+                "- 기억할 표현 0~2곳은 선택한 실제 구절 앞뒤에 ~~를 붙인다.\n"
+                "- 댓글은 밑줄 바로 뒤에 [^1]을 붙이고, 본문이 끝난 다음 새 줄에 [^1]: 댓글로 써라.\n"
+                "형식 예시: 입력이 '바람이 분다.'라면 출력은 '__바람이 분다.__'처럼 쓴다. "
+                "예시의 '바람이 분다.'는 실제 출력에 복사하지 마라. "
+                "꾸밈 기호와 별도 각주 정의를 제외한 본문 글자는 교정문과 완전히 같아야 한다.\n"
+                "과하게 꾸미지 말고, 코드 블록이나 다른 Markdown 문법은 쓰지 마라. "
+                "모든 여는 꾸밈 기호는 줄이 바뀌더라도 반드시 같은 종류의 닫는 기호와 짝을 맞춰라.\n\n"
+                f"교정문:\n{corrected}"
+            )
+            decoration_schema = {
+                "type": "object",
+                "properties": {"recommended_markdown": {"type": "string"}},
+                "required": ["recommended_markdown"],
+            }
+            recommended = _sanitize_markdown_recommendation(
+                request_json(decoration_prompt, decoration_schema)["recommended_markdown"].strip()
+            )
+            if recommended and not _markdown_preserves_source(recommended, corrected):
+                retry_prompt = (
+                    decoration_prompt
+                    + "\n\n이전 응답은 교정문에 없는 글자를 본문에 추가해 실패했다. "
+                      "이번에는 교정문에 실제로 존재하는 구절만 기호로 감싸고 본문을 정확히 보존하라."
+                )
+                recommended = _sanitize_markdown_recommendation(
+                    request_json(retry_prompt, decoration_schema)["recommended_markdown"].strip()
+                )
+            if not recommended or not _markdown_preserves_source(recommended, corrected):
+                recommended = corrected
         except urllib.error.URLError as exc:
             raise RuntimeError(
                 "로컬 AI(Ollama)에 연결하지 못했습니다. Ollama가 실행 중인지 확인하세요: "
@@ -282,8 +377,7 @@ class KoreanOCRAutoCorrect:
             ) from exc
         except (json.JSONDecodeError, KeyError, TypeError) as exc:
             raise RuntimeError("로컬 AI 교정 결과를 읽지 못했습니다. 다시 실행해 주세요.") from exc
-        selected = recommended if 꾸밈_선택 == "자동 추천 사용" else corrected
-        return (selected, corrected, recommended)
+        return (recommended, corrected, OCR_텍스트)
 
 
 _FONT_LABELS = ["자동 (맑은 고딕)", "맑은 고딕", "맑은 고딕 굵게", "맑은 고딕 가늘게",
@@ -487,16 +581,33 @@ def _parse_inline_markdown(line: str):
 
 def _parse_markdown_document(text: str):
     footnotes = {}
-    body_lines = []
+    body_source = []
     for line in text.splitlines():
         definition = re.match(r"^\[\^([^\]]+)\]:\s*(.*)$", line)
         if definition:
             footnotes[definition.group(1)] = definition.group(2).strip()
         else:
-            body_lines.append(_parse_inline_markdown(line))
-    if not body_lines:
-        body_lines = [[]]
-    return body_lines, footnotes
+            body_source.append(line)
+
+    # Parse the body as one string so a marker can open on one source line and
+    # close on another. Split the styled tokens back into source lines after
+    # parsing; this preserves both explicit line breaks and the active style.
+    flat_tokens = _parse_inline_markdown("\n".join(body_source))
+    body_lines = [[]]
+    for token in flat_tokens:
+        if token["style"] == "reference":
+            body_lines[-1].append(token)
+            continue
+        parts = token["text"].split("\n")
+        for index, part in enumerate(parts):
+            if part:
+                if body_lines[-1] and body_lines[-1][-1]["style"] == token["style"]:
+                    body_lines[-1][-1]["text"] += part
+                else:
+                    body_lines[-1].append({"style": token["style"], "text": part})
+            if index < len(parts) - 1:
+                body_lines.append([])
+    return body_lines or [[]], footnotes
 
 
 def _wrap_styled_lines(draw, source_lines, font, reference_font, max_width):

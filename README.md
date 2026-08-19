@@ -14,7 +14,7 @@ Photographed Korean book page → painted mask region only → local-AI correcti
 ## Nodes
 
 - **마스크 영역 한국어 OCR** — crops and recognizes only the painted mask region.
-- **로컬 AI OCR 교정 + 꾸밈 추천** — returns both a corrected plain-text version and a Qwen-recommended Markdown decoration version; a selector chooses which one continues to the editor.
+- **로컬 AI OCR 교정 + 꾸밈 추천** — performs a two-pass typo review and sends a Qwen-recommended Markdown decoration version to the editor while exposing plain correction and OCR source outputs.
 - **글꼴·색상·크기 설정 + 미리보기** — centralizes all visual parameters and renders a live preview image.
 - **OCR 텍스트 수정 → 이미지** — edits OCR text and directly renders Markdown-like italic, highlighter, colored-pencil underline, and footnote comments.
 - **한국어 OCR / 한국어 텍스트 → 이미지** — simpler reusable OCR and text rendering nodes.
@@ -43,9 +43,9 @@ ollama pull qwen3:8b
 ## Use
 
 1. Select a book photo in `Load Image`.
-2. Right-click the node and open **Mask Editor**.
-3. Paint only the paragraph to recognize and save the mask.
-4. Choose **자동 추천 사용** or **추천 없이 교정만**, then queue once. Ollama sends the selected result to **OCR 텍스트 수정 → 이미지**.
+2. Leave the mask empty to OCR the whole image, or open **Mask Editor** to select only part of it.
+3. If using a mask, paint the paragraph to recognize and save it.
+4. Queue once. Ollama performs precise typo correction and sends its Markdown recommendation to **OCR 텍스트 수정 → 이미지**.
 5. Set fonts, sizes, and colors in **글꼴·색상·크기 설정 + 미리보기**. The default pencil underline is red.
 6. Correct text or add Markdown styles, then queue again to render and save.
 
@@ -58,6 +58,8 @@ __colored-pencil underline__[^1]
 
 [^1]: A smaller red handwritten comment attached to the underlined phrase.
 ```
+
+Underline, italic, and highlighter markers may open on one source line and close on another.
 
 각주 문법은 `__밑줄__[^id]`와 `[^id]: 코멘트`를 함께 사용합니다. Footnote definitions are removed from the main body and rendered below it in smaller red handwriting.
 
