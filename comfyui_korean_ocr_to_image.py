@@ -205,10 +205,6 @@ class KoreanEditableText:
                     "STRING",
                     {"default": "", "multiline": True, "dynamicPrompts": False},
                 ),
-                "comment": (
-                    "STRING",
-                    {"default": "", "multiline": True, "dynamicPrompts": False},
-                ),
                 "width": ("INT", {"default": 1200, "min": 256, "max": 8192, "step": 8}),
                 "font_size": ("INT", {"default": 48, "min": 8, "max": 512}),
                 "comment_font_size": ("INT", {"default": 32, "min": 8, "max": 256}),
@@ -228,13 +224,13 @@ class KoreanEditableText:
     FUNCTION = "choose_text"
     CATEGORY = "Korean OCR"
 
-    def choose_text(self, ocr_text, edited_text, comment, width, font_size,
+    def choose_text(self, ocr_text, edited_text, width, font_size,
                     comment_font_size, padding, line_spacing, font_path,
                     comment_font_path, text_color, pencil_color,
                     highlight_color, background_color):
         effective = edited_text if edited_text.strip() else ocr_text
         image = KoreanBookTextToImage().render_book_page(
-            effective, comment, width, font_size, comment_font_size, padding,
+            effective, "", width, font_size, comment_font_size, padding,
             line_spacing, font_path, comment_font_path, text_color,
             pencil_color, highlight_color, background_color,
         )[0]

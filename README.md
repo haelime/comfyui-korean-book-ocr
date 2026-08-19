@@ -8,7 +8,7 @@ Photographed Korean book page → painted mask region only → editable OCR text
 
 - **마스크 영역 한국어 OCR** — crops and recognizes only the painted mask region.
 - **OCR 텍스트 수정** — automatically fills an editable multiline widget after OCR; user corrections are preserved.
-- **책 문장 꾸미기 → 이미지** — renders Markdown-like italic, highlighter, colored-pencil underline, and footnote comments.
+- **OCR 텍스트 수정 → 이미지** — edits OCR text and directly renders Markdown-like italic, highlighter, colored-pencil underline, and footnote comments.
 - **한국어 OCR / 한국어 텍스트 → 이미지** — simpler reusable OCR and text rendering nodes.
 
 ## Install
@@ -52,7 +52,7 @@ See [README.ko.md](README.ko.md) for detailed Korean instructions and [UTILITY_N
 ## Notes
 
 - Windows automatically uses Malgun Gothic for the main text when available.
-- The comment renderer tries common Korean handwriting fonts first, then falls back to a Korean system font.
+- The footnote renderer tries common Korean handwriting fonts first, then falls back to a Korean system font.
 - `enable_mkldnn=False` is intentional: it avoids a Paddle 3.3.x oneDNN/PIR inference failure seen on Windows CPU execution.
 - OCR models are downloaded by PaddleOCR on first use.
 
