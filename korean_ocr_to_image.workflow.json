@@ -1,23 +1,21 @@
 {
-  "last_node_id": 8,
-  "last_link_id": 7,
+  "last_node_id": 11,
+  "last_link_id": 10,
   "nodes": [
     {
       "id": 8,
       "type": "Note",
-      "pos": [20, -260],
-      "size": [1150, 240],
-      "flags": {}, "order": 6, "mode": 0,
-      "inputs": [], "outputs": [],
-      "properties": {},
-      "widgets_values": ["사용법\n1. Load Image에서 책 사진을 선택하고 우클릭 → Open in Mask Editor\n2. OCR할 부분만 흰색으로 칠한 뒤 저장\n3. Queue 1회 → ‘OCR 텍스트 수정 → 이미지’에 OCR 결과가 자동 입력됨\n4. 같은 노드에서 글을 수정하고 아래 문법으로 꾸민 뒤 Queue 재실행\n\n__색연필 밑줄__[^1]    *이탤릭*    ~~형광펜~~\n[^1]: 밑줄에 연결할 붉은 손글씨 댓글\n\n새 OCR 결과로 되돌리기: ‘OCR 원문으로 재설정’ 버튼"],
-      "color": "#2a363b",
-      "bgcolor": "#3f5158"
+      "pos": [20, -320],
+      "size": [1630, 280],
+      "flags": {}, "order": 9, "mode": 0,
+      "inputs": [], "outputs": [], "properties": {},
+      "widgets_values": ["사용법\n1. Load Image에서 책 사진 선택 → 우클릭 → Open in Mask Editor\n2. OCR할 부분만 흰색으로 칠하고 Queue 실행\n3. ‘로컬 AI OCR 자동 교정’이 오인식·띄어쓰기·문장부호를 교정\n4. ‘OCR 텍스트 수정 → 이미지’에서 결과를 확인하고 직접 수정한 뒤 Queue 재실행\n5. 글꼴·색상·크기는 ‘글꼴·색상·크기 설정 + 미리보기’에서 변경\n\n__붉은 색연필 밑줄__[^1]    *이탤릭*    ~~형광펜~~\n[^1]: 밑줄에 연결할 붉은 손글씨 댓글\n\nAI를 쓰지 않으려면 자동_교정을 끄세요. 수정 내용을 교정본으로 되돌리려면 ‘AI 교정본으로 재설정’ 버튼을 누르세요."],
+      "color": "#2a363b", "bgcolor": "#3f5158"
     },
     {
       "id": 1,
       "type": "LoadImage",
-      "pos": [20, 160],
+      "pos": [20, 120],
       "size": [315, 314],
       "flags": {}, "order": 0, "mode": 0,
       "inputs": [],
@@ -31,58 +29,95 @@
     {
       "id": 2,
       "type": "KoreanMaskedOCR",
-      "pos": [390, 160],
-      "size": [330, 250],
+      "pos": [390, 120],
+      "size": [330, 280],
       "flags": {}, "order": 1, "mode": 0,
       "inputs": [
-        {"name": "image", "type": "IMAGE", "link": 1},
-        {"name": "mask", "type": "MASK", "link": 2}
+        {"name": "이미지", "type": "IMAGE", "link": 1},
+        {"name": "마스크", "type": "MASK", "link": 2}
       ],
       "outputs": [
-        {"name": "korean_text", "type": "STRING", "links": [3], "slot_index": 0},
-        {"name": "masked_preview", "type": "IMAGE", "links": [4], "slot_index": 1}
+        {"name": "한국어_텍스트", "type": "STRING", "links": [3], "slot_index": 0},
+        {"name": "마스크_미리보기", "type": "IMAGE", "links": [4], "slot_index": 1}
       ],
       "properties": {"Node name for S&R": "KoreanMaskedOCR"},
       "widgets_values": ["PP-OCRv5", true, false, true, false, 16]
     },
     {
+      "id": 9,
+      "type": "KoreanOCRAutoCorrect",
+      "pos": [770, 120],
+      "size": [410, 310],
+      "flags": {}, "order": 2, "mode": 0,
+      "inputs": [{"name": "OCR_텍스트", "type": "STRING", "link": 3}],
+      "outputs": [{"name": "교정_텍스트", "type": "STRING", "links": [8], "slot_index": 0}],
+      "properties": {"Node name for S&R": "KoreanOCRAutoCorrect"},
+      "widgets_values": [true, "qwen3:8b", "보수적", true, "http://127.0.0.1:11434", 180]
+    },
+    {
+      "id": 10,
+      "type": "KoreanTextStyleSettings",
+      "pos": [770, 500],
+      "size": [430, 620],
+      "flags": {}, "order": 3, "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {"name": "스타일_설정", "type": "KOREAN_TEXT_STYLE", "links": [9], "slot_index": 0},
+        {"name": "스타일_미리보기", "type": "IMAGE", "links": [10], "slot_index": 1}
+      ],
+      "properties": {"Node name for S&R": "KoreanTextStyleSettings"},
+      "widgets_values": [1200, "자동 (맑은 고딕)", "", 48, "맑은 고딕", "", 32, 80, 24, "#202020", "#C63B3B", "#FFF176", "#FFFDF7"]
+    },
+    {
       "id": 3,
       "type": "KoreanEditableText",
-      "pos": [780, 160],
-      "size": [430, 600],
-      "flags": {}, "order": 2, "mode": 0,
-      "inputs": [{"name": "ocr_text", "type": "STRING", "link": 3}],
+      "pos": [1250, 120],
+      "size": [430, 520],
+      "flags": {}, "order": 4, "mode": 0,
+      "inputs": [
+        {"name": "OCR_텍스트", "type": "STRING", "link": 8},
+        {"name": "스타일_설정", "type": "KOREAN_TEXT_STYLE", "link": 9}
+      ],
       "outputs": [
-        {"name": "final_text", "type": "STRING", "links": null, "slot_index": 0},
-        {"name": "annotated_page", "type": "IMAGE", "links": [6, 7], "slot_index": 1}
+        {"name": "최종_텍스트", "type": "STRING", "links": null, "slot_index": 0},
+        {"name": "꾸민_이미지", "type": "IMAGE", "links": [6, 7], "slot_index": 1}
       ],
       "properties": {"Node name for S&R": "KoreanEditableText"},
-      "widgets_values": ["", 1200, 48, 32, 80, 24, "AUTO", "AUTO", "#202020", "#3F6FB5", "#FFF176", "#FFFDF7"]
+      "widgets_values": [""]
     },
     {
       "id": 5,
       "type": "PreviewImage",
-      "pos": [780, 500],
-      "size": [360, 300],
-      "flags": {}, "order": 4, "mode": 0,
+      "pos": [390, 470],
+      "size": [330, 300],
+      "flags": {}, "order": 5, "mode": 0,
       "inputs": [{"name": "images", "type": "IMAGE", "link": 4}],
+      "outputs": [], "properties": {"Node name for S&R": "PreviewImage"}, "widgets_values": []
+    },
+    {
+      "id": 11,
+      "type": "PreviewImage",
+      "pos": [1250, 700],
+      "size": [430, 330],
+      "flags": {}, "order": 6, "mode": 0,
+      "inputs": [{"name": "images", "type": "IMAGE", "link": 10}],
       "outputs": [], "properties": {"Node name for S&R": "PreviewImage"}, "widgets_values": []
     },
     {
       "id": 6,
       "type": "PreviewImage",
-      "pos": [1280, 100],
+      "pos": [1730, 100],
       "size": [430, 360],
-      "flags": {}, "order": 4, "mode": 0,
+      "flags": {}, "order": 7, "mode": 0,
       "inputs": [{"name": "images", "type": "IMAGE", "link": 6}],
       "outputs": [], "properties": {"Node name for S&R": "PreviewImage"}, "widgets_values": []
     },
     {
       "id": 7,
       "type": "SaveImage",
-      "pos": [1280, 520],
+      "pos": [1730, 520],
       "size": [315, 270],
-      "flags": {}, "order": 5, "mode": 0,
+      "flags": {}, "order": 8, "mode": 0,
       "inputs": [{"name": "images", "type": "IMAGE", "link": 7}],
       "outputs": [], "properties": {"Node name for S&R": "SaveImage"},
       "widgets_values": ["korean_book_quote"]
@@ -90,10 +125,12 @@
   ],
   "links": [
     [1, 1, 0, 2, 0, "IMAGE"], [2, 1, 1, 2, 1, "MASK"],
-    [3, 2, 0, 3, 0, "STRING"], [4, 2, 1, 5, 0, "IMAGE"],
-    [6, 3, 1, 6, 0, "IMAGE"], [7, 3, 1, 7, 0, "IMAGE"]
+    [3, 2, 0, 9, 0, "STRING"], [4, 2, 1, 5, 0, "IMAGE"],
+    [8, 9, 0, 3, 0, "STRING"], [9, 10, 0, 3, 1, "KOREAN_TEXT_STYLE"],
+    [10, 10, 1, 11, 0, "IMAGE"], [6, 3, 1, 6, 0, "IMAGE"],
+    [7, 3, 1, 7, 0, "IMAGE"]
   ],
   "groups": [], "config": {},
-  "extra": {"ds": {"scale": 0.76, "offset": [20, 70]}},
+  "extra": {"ds": {"scale": 0.68, "offset": [20, 90]}},
   "version": 0.4
 }

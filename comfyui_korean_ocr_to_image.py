@@ -9,6 +9,9 @@ from __future__ import annotations
 
 import os
 import re
+import json
+import urllib.error
+import urllib.request
 from functools import lru_cache
 
 import numpy as np
@@ -115,22 +118,22 @@ class KoreanOCR:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "image": ("IMAGE",),
-                "ocr_version": (["PP-OCRv5", "PP-OCRv4", "PP-OCRv3"], {"default": "PP-OCRv5"}),
-                "detect_rotation": ("BOOLEAN", {"default": True}),
-                "document_unwarp": ("BOOLEAN", {"default": True}),
-                "enhance_book_photo": ("BOOLEAN", {"default": True}),
+                "이미지": ("IMAGE",),
+                "OCR_버전": (["PP-OCRv5", "PP-OCRv4", "PP-OCRv3"], {"default": "PP-OCRv5"}),
+                "회전_감지": ("BOOLEAN", {"default": True}),
+                "문서_펴기": ("BOOLEAN", {"default": True}),
+                "책_사진_보정": ("BOOLEAN", {"default": True}),
             }
         }
 
     RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("korean_text",)
+    RETURN_NAMES = ("한국어_텍스트",)
     FUNCTION = "recognize"
-    CATEGORY = "Korean OCR"
+    CATEGORY = "한국어 OCR"
 
-    def recognize(self, image, ocr_version, detect_rotation, document_unwarp, enhance_book_photo):
-        rgb = _tensor_to_rgb(image)
-        if enhance_book_photo:
+    def recognize(self, 이미지, OCR_버전, 회전_감지, 문서_펴기, 책_사진_보정):
+        rgb = _tensor_to_rgb(이미지)
+        if 책_사진_보정:
             page = Image.fromarray(rgb)
             # Book photos often have dim gutters, soft focus, and too few pixels per glyph.
             gray = ImageOps.grayscale(page)
@@ -145,13 +148,13 @@ class KoreanOCR:
                 )
             rgb = np.asarray(gray.convert("RGB"))
 
-        ocr = _make_ocr(ocr_version, detect_rotation, document_unwarp)
+        ocr = _make_ocr(OCR_버전, 회전_감지, 문서_펴기)
 
         try:
             result = list(ocr.predict(input=rgb))
         except (AttributeError, TypeError):
             try:
-                result = ocr.ocr(rgb, cls=detect_rotation)
+                result = ocr.ocr(rgb, cls=회전_감지)
             except TypeError:
                 result = ocr.ocr(rgb)
 
@@ -169,30 +172,181 @@ class KoreanMaskedOCR(KoreanOCR):
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "image": ("IMAGE",),
-                "mask": ("MASK",),
-                "ocr_version": (["PP-OCRv5", "PP-OCRv4", "PP-OCRv3"], {"default": "PP-OCRv5"}),
-                "detect_rotation": ("BOOLEAN", {"default": True}),
-                "document_unwarp": ("BOOLEAN", {"default": False}),
-                "enhance_book_photo": ("BOOLEAN", {"default": True}),
-                "invert_mask": ("BOOLEAN", {"default": False}),
-                "crop_margin": ("INT", {"default": 16, "min": 0, "max": 512}),
+                "이미지": ("IMAGE",),
+                "마스크": ("MASK",),
+                "OCR_버전": (["PP-OCRv5", "PP-OCRv4", "PP-OCRv3"], {"default": "PP-OCRv5"}),
+                "회전_감지": ("BOOLEAN", {"default": True}),
+                "문서_펴기": ("BOOLEAN", {"default": False}),
+                "책_사진_보정": ("BOOLEAN", {"default": True}),
+                "마스크_반전": ("BOOLEAN", {"default": False}),
+                "자르기_여백": ("INT", {"default": 16, "min": 0, "max": 512}),
             }
         }
 
     RETURN_TYPES = ("STRING", "IMAGE")
-    RETURN_NAMES = ("korean_text", "masked_preview")
+    RETURN_NAMES = ("한국어_텍스트", "마스크_미리보기")
     FUNCTION = "recognize_masked"
-    CATEGORY = "Korean OCR"
+    CATEGORY = "한국어 OCR"
 
-    def recognize_masked(self, image, mask, ocr_version, detect_rotation, document_unwarp,
-                         enhance_book_photo, invert_mask, crop_margin):
-        cropped = _masked_crop(_tensor_to_rgb(image), mask, invert_mask, crop_margin)
+    def recognize_masked(self, 이미지, 마스크, OCR_버전, 회전_감지, 문서_펴기,
+                         책_사진_보정, 마스크_반전, 자르기_여백):
+        cropped = _masked_crop(_tensor_to_rgb(이미지), 마스크, 마스크_반전, 자르기_여백)
         tensor = torch.from_numpy(cropped.astype(np.float32) / 255.0).unsqueeze(0)
         text = self.recognize(
-            tensor, ocr_version, detect_rotation, document_unwarp, enhance_book_photo
+            tensor, OCR_버전, 회전_감지, 문서_펴기, 책_사진_보정
         )[0]
         return (text, tensor)
+
+
+class KoreanOCRAutoCorrect:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "OCR_텍스트": ("STRING", {"forceInput": True}),
+                "자동_교정": ("BOOLEAN", {"default": True}),
+                "모델": ("STRING", {"default": "qwen3:8b"}),
+                "교정_강도": (["보수적", "일반"], {"default": "보수적"}),
+                "고유명사_보존": ("BOOLEAN", {"default": True}),
+                "올라마_주소": ("STRING", {"default": "http://127.0.0.1:11434"}),
+                "제한_시간_초": ("INT", {"default": 180, "min": 10, "max": 1800}),
+            }
+        }
+
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("교정_텍스트",)
+    FUNCTION = "교정"
+    CATEGORY = "한국어 OCR"
+
+    def 교정(self, OCR_텍스트, 자동_교정, 모델, 교정_강도, 고유명사_보존,
+             올라마_주소, 제한_시간_초):
+        if not 자동_교정 or not OCR_텍스트.strip():
+            return (OCR_텍스트,)
+
+        strength = (
+            "명백한 OCR 오인식, 띄어쓰기, 문장부호만 고치고 문체와 어휘는 바꾸지 마라."
+            if 교정_강도 == "보수적"
+            else "OCR 오인식과 맞춤법을 고치되 원문의 의미와 문체를 유지하라."
+        )
+        proper_nouns = (
+            "사람 이름, 지명, 작품명 등 고유명사는 확실한 근거가 없으면 절대 바꾸지 마라."
+            if 고유명사_보존 else "문맥상 명백히 잘못 인식된 고유명사는 교정해도 된다."
+        )
+        prompt = (
+            "다음은 한국어 소설책 사진에서 추출한 OCR 텍스트다.\n"
+            f"{strength}\n{proper_nouns}\n"
+            "문단과 줄바꿈을 가능한 한 보존하고, 내용을 추가·요약·번역하지 마라. "
+            "출력은 corrected_text 필드만 가진 JSON 객체여야 한다.\n\n"
+            f"OCR 원문:\n{OCR_텍스트}"
+        )
+        schema = {
+            "type": "object",
+            "properties": {"corrected_text": {"type": "string"}},
+            "required": ["corrected_text"],
+        }
+        payload = json.dumps({
+            "model": 모델.strip() or "qwen3:8b",
+            "prompt": prompt,
+            "stream": False,
+            "think": False,
+            "format": schema,
+            "options": {"temperature": 0.1},
+        }, ensure_ascii=False).encode("utf-8")
+        request = urllib.request.Request(
+            올라마_주소.rstrip("/") + "/api/generate",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=제한_시간_초) as response:
+                result = json.loads(response.read().decode("utf-8"))
+            corrected = json.loads(result.get("response", "{}"))["corrected_text"]
+        except urllib.error.URLError as exc:
+            raise RuntimeError(
+                "로컬 AI(Ollama)에 연결하지 못했습니다. Ollama가 실행 중인지 확인하세요: "
+                f"{올라마_주소}"
+            ) from exc
+        except (json.JSONDecodeError, KeyError, TypeError) as exc:
+            raise RuntimeError("로컬 AI 교정 결과를 읽지 못했습니다. 다시 실행해 주세요.") from exc
+        return (corrected.strip() or OCR_텍스트,)
+
+
+_FONT_LABELS = ["자동 (맑은 고딕)", "맑은 고딕", "맑은 고딕 굵게", "맑은 고딕 가늘게",
+                "굴림", "바탕", "Noto Sans KR", "Noto Serif KR", "직접 입력"]
+
+
+def _selected_font_path(label, direct_path):
+    if direct_path.strip():
+        return direct_path.strip()
+    windir = os.environ.get("WINDIR", r"C:\Windows")
+    filenames = {
+        "맑은 고딕": "malgun.ttf",
+        "맑은 고딕 굵게": "malgunbd.ttf",
+        "맑은 고딕 가늘게": "malgunsl.ttf",
+        "굴림": "gulim.ttc",
+        "바탕": "batang.ttc",
+        "Noto Sans KR": "NotoSansKR-VF.ttf",
+        "Noto Serif KR": "NotoSerifKR-VF.ttf",
+    }
+    filename = filenames.get(label)
+    return os.path.join(windir, "Fonts", filename) if filename else "AUTO"
+
+
+class KoreanTextStyleSettings:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "이미지_너비": ("INT", {"default": 1200, "min": 256, "max": 8192, "step": 8}),
+                "본문_글꼴": (_FONT_LABELS, {"default": "자동 (맑은 고딕)"}),
+                "직접_글꼴_경로": ("STRING", {"default": ""}),
+                "본문_크기": ("INT", {"default": 48, "min": 8, "max": 512}),
+                "댓글_글꼴": (_FONT_LABELS, {"default": "맑은 고딕"}),
+                "직접_댓글_글꼴_경로": ("STRING", {"default": ""}),
+                "댓글_크기": ("INT", {"default": 32, "min": 8, "max": 256}),
+                "여백": ("INT", {"default": 80, "min": 0, "max": 1024}),
+                "줄_간격": ("INT", {"default": 24, "min": 0, "max": 256}),
+                "본문_색": ("STRING", {"default": "#202020"}),
+                "밑줄_색": ("STRING", {"default": "#C63B3B"}),
+                "형광펜_색": ("STRING", {"default": "#FFF176"}),
+                "배경_색": ("STRING", {"default": "#FFFDF7"}),
+            }
+        }
+
+    RETURN_TYPES = ("KOREAN_TEXT_STYLE", "IMAGE")
+    RETURN_NAMES = ("스타일_설정", "스타일_미리보기")
+    FUNCTION = "설정"
+    CATEGORY = "한국어 OCR"
+
+    def 설정(self, 이미지_너비, 본문_글꼴, 직접_글꼴_경로, 본문_크기,
+             댓글_글꼴, 직접_댓글_글꼴_경로, 댓글_크기, 여백, 줄_간격,
+             본문_색, 밑줄_색, 형광펜_색, 배경_색):
+        style = {
+            "width": 이미지_너비,
+            "font_size": 본문_크기,
+            "comment_font_size": 댓글_크기,
+            "padding": 여백,
+            "line_spacing": 줄_간격,
+            "font_path": _selected_font_path(본문_글꼴, 직접_글꼴_경로),
+            "comment_font_path": _selected_font_path(댓글_글꼴, 직접_댓글_글꼴_경로),
+            "text_color": 본문_색,
+            "pencil_color": 밑줄_색,
+            "highlight_color": 형광펜_색,
+            "background_color": 배경_색,
+        }
+        sample = (
+            "글꼴과 크기 미리보기\n"
+            "__붉은 색연필 밑줄__[^1]  *이탤릭*  ~~형광펜~~\n\n"
+            "[^1]: 작은 붉은 글씨 댓글"
+        )
+        image = KoreanBookTextToImage().render_book_page(
+            sample, "", style["width"], style["font_size"],
+            style["comment_font_size"], style["padding"], style["line_spacing"],
+            style["font_path"], style["comment_font_path"], style["text_color"],
+            style["pencil_color"], style["highlight_color"], style["background_color"],
+        )[0]
+        return (style, image)
 
 
 class KoreanEditableText:
@@ -200,42 +354,31 @@ class KoreanEditableText:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "ocr_text": ("STRING", {"forceInput": True}),
-                "edited_text": (
+                "OCR_텍스트": ("STRING", {"forceInput": True}),
+                "스타일_설정": ("KOREAN_TEXT_STYLE", {"forceInput": True}),
+                "수정_텍스트": (
                     "STRING",
                     {"default": "", "multiline": True, "dynamicPrompts": False},
                 ),
-                "width": ("INT", {"default": 1200, "min": 256, "max": 8192, "step": 8}),
-                "font_size": ("INT", {"default": 48, "min": 8, "max": 512}),
-                "comment_font_size": ("INT", {"default": 32, "min": 8, "max": 256}),
-                "padding": ("INT", {"default": 80, "min": 0, "max": 1024}),
-                "line_spacing": ("INT", {"default": 24, "min": 0, "max": 256}),
-                "font_path": ("STRING", {"default": "AUTO"}),
-                "comment_font_path": ("STRING", {"default": "AUTO"}),
-                "text_color": ("STRING", {"default": "#202020"}),
-                "pencil_color": ("STRING", {"default": "#3F6FB5"}),
-                "highlight_color": ("STRING", {"default": "#FFF176"}),
-                "background_color": ("STRING", {"default": "#FFFDF7"}),
             }
         }
 
     RETURN_TYPES = ("STRING", "IMAGE")
-    RETURN_NAMES = ("final_text", "annotated_page")
+    RETURN_NAMES = ("최종_텍스트", "꾸민_이미지")
     FUNCTION = "choose_text"
-    CATEGORY = "Korean OCR"
+    CATEGORY = "한국어 OCR"
 
-    def choose_text(self, ocr_text, edited_text, width, font_size,
-                    comment_font_size, padding, line_spacing, font_path,
-                    comment_font_path, text_color, pencil_color,
-                    highlight_color, background_color):
-        effective = edited_text if edited_text.strip() else ocr_text
+    def choose_text(self, OCR_텍스트, 스타일_설정, 수정_텍스트):
+        effective = 수정_텍스트 if 수정_텍스트.strip() else OCR_텍스트
+        style = 스타일_설정
         image = KoreanBookTextToImage().render_book_page(
-            effective, "", width, font_size, comment_font_size, padding,
-            line_spacing, font_path, comment_font_path, text_color,
-            pencil_color, highlight_color, background_color,
+            effective, "", style["width"], style["font_size"],
+            style["comment_font_size"], style["padding"], style["line_spacing"],
+            style["font_path"], style["comment_font_path"], style["text_color"],
+            style["pencil_color"], style["highlight_color"], style["background_color"],
         )[0]
-        # The frontend uses ocr_text to populate the editable widget after pass one.
-        return {"ui": {"ocr_text": [ocr_text]}, "result": (effective, image)}
+        # The frontend uses source_text to populate the editable widget after pass one.
+        return {"ui": {"source_text": [OCR_텍스트]}, "result": (effective, image)}
 
 
 def _font_candidates(font_path: str):
@@ -467,7 +610,7 @@ class KoreanBookTextToImage:
                 "font_path": ("STRING", {"default": "AUTO"}),
                 "comment_font_path": ("STRING", {"default": "AUTO"}),
                 "text_color": ("STRING", {"default": "#202020"}),
-                "pencil_color": ("STRING", {"default": "#3F6FB5"}),
+                "pencil_color": ("STRING", {"default": "#C63B3B"}),
                 "highlight_color": ("STRING", {"default": "#FFF176"}),
                 "background_color": ("STRING", {"default": "#FFFDF7"}),
             }
@@ -577,6 +720,8 @@ class KoreanBookTextToImage:
 NODE_CLASS_MAPPINGS = {
     "KoreanOCR": KoreanOCR,
     "KoreanMaskedOCR": KoreanMaskedOCR,
+    "KoreanOCRAutoCorrect": KoreanOCRAutoCorrect,
+    "KoreanTextStyleSettings": KoreanTextStyleSettings,
     "KoreanEditableText": KoreanEditableText,
     "KoreanTextToImage": KoreanTextToImage,
 }
@@ -584,6 +729,8 @@ NODE_CLASS_MAPPINGS = {
 NODE_DISPLAY_NAME_MAPPINGS = {
     "KoreanOCR": "한국어 OCR (PaddleOCR)",
     "KoreanMaskedOCR": "마스크 영역 한국어 OCR",
+    "KoreanOCRAutoCorrect": "로컬 AI OCR 자동 교정",
+    "KoreanTextStyleSettings": "글꼴·색상·크기 설정 + 미리보기",
     "KoreanEditableText": "OCR 텍스트 수정 → 이미지",
     "KoreanTextToImage": "한국어 텍스트 → 이미지",
 }
