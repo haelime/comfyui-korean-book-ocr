@@ -23,7 +23,7 @@
 ## 여러 사진 한꺼번에 처리
 
 1. `ComfyUI/input/대량_OCR_사진`에 사진을 넣습니다.
-2. `korean_ocr_batch` 워크플로우를 열고 ① 단계를 실행합니다.
+2. `korean_ocr_batch` 워크플로우를 열고 노드의 `사진 폴더 선택…` 버튼으로 폴더를 지정한 뒤 ① 단계를 실행합니다.
 3. `ComfyUI/output/korean_book_ocr/text`의 TXT를 직접 수정합니다.
 4. ② 단계를 실행하면 TXT마다 PNG 한 장이 `output/korean_book_ocr/images`에 저장됩니다.
 

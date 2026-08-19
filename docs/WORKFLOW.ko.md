@@ -69,7 +69,7 @@ __첫 줄에서 시작한 밑줄이
 
 ### 1단계: 사진을 TXT로 만들기
 
-1. `ComfyUI/input/대량_OCR_사진`에 JPG, JPEG, PNG, WebP, BMP 또는 TIFF 사진을 넣습니다.
+1. `ComfyUI/input/대량_OCR_사진`에 JPG, JPEG, PNG, WebP, BMP 또는 TIFF 사진을 넣습니다. 다른 폴더를 쓰려면 노드의 `OCR할 사진 폴더 선택…` 버튼을 누릅니다.
 2. `① 사진 폴더 → OCR 텍스트 파일`의 `실행`을 켭니다.
 3. Queue를 누릅니다.
 4. 결과는 `ComfyUI/output/korean_book_ocr/text`에 원본 사진과 같은 이름의 TXT로 저장됩니다.
@@ -89,3 +89,5 @@ __첫 줄에서 시작한 밑줄이
 5. 결과는 `ComfyUI/output/korean_book_ocr/images`에 TXT와 같은 이름의 PNG로 저장됩니다.
 
 사진을 하위 폴더로 나누면 TXT와 PNG도 같은 하위 폴더 구조로 정리됩니다. 처리 중 일부 파일에 오류가 나더라도 나머지 파일은 계속 처리하며 작업 결과에 오류 수를 표시합니다.
+
+사진·텍스트·이미지 폴더는 모두 노드 안의 `폴더 선택…` 버튼으로 지정할 수 있습니다. 선택 창에는 ComfyUI의 `input` 또는 `output` 아래에 있는 폴더가 표시됩니다. 새 이름을 직접 입력하면 실행 시 해당 폴더가 만들어집니다.
