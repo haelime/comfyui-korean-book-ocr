@@ -1,0 +1,96 @@
+{
+  "last_node_id": 7,
+  "last_link_id": 7,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "LoadImage",
+      "pos": [20, 160],
+      "size": [315, 314],
+      "flags": {}, "order": 0, "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [1], "slot_index": 0},
+        {"name": "MASK", "type": "MASK", "links": [2], "slot_index": 1}
+      ],
+      "properties": {"Node name for S&R": "LoadImage"},
+      "widgets_values": ["OCR할_소설책_사진.png", "image"]
+    },
+    {
+      "id": 2,
+      "type": "KoreanMaskedOCR",
+      "pos": [390, 160],
+      "size": [330, 250],
+      "flags": {}, "order": 1, "mode": 0,
+      "inputs": [
+        {"name": "image", "type": "IMAGE", "link": 1},
+        {"name": "mask", "type": "MASK", "link": 2}
+      ],
+      "outputs": [
+        {"name": "korean_text", "type": "STRING", "links": [3], "slot_index": 0},
+        {"name": "masked_preview", "type": "IMAGE", "links": [4], "slot_index": 1}
+      ],
+      "properties": {"Node name for S&R": "KoreanMaskedOCR"},
+      "widgets_values": ["PP-OCRv5", true, false, true, false, 16]
+    },
+    {
+      "id": 3,
+      "type": "KoreanEditableText",
+      "pos": [780, 160],
+      "size": [390, 280],
+      "flags": {}, "order": 2, "mode": 0,
+      "inputs": [{"name": "ocr_text", "type": "STRING", "link": 3}],
+      "outputs": [{"name": "final_text", "type": "STRING", "links": [5], "slot_index": 0}],
+      "properties": {"Node name for S&R": "KoreanEditableText"},
+      "widgets_values": [""]
+    },
+    {
+      "id": 4,
+      "type": "KoreanBookTextToImage",
+      "pos": [1230, 160],
+      "size": [420, 520],
+      "flags": {}, "order": 3, "mode": 0,
+      "inputs": [{"name": "text", "type": "STRING", "link": 5}],
+      "outputs": [{"name": "annotated_page", "type": "IMAGE", "links": [6, 7], "slot_index": 0}],
+      "properties": {"Node name for S&R": "KoreanBookTextToImage"},
+      "widgets_values": ["마음에 남는 문장.", 1200, 48, 32, 80, 24, "both", "AUTO", "AUTO", "#202020", "#3F6FB5", "#FFF176", "#FFFDF7"]
+    },
+    {
+      "id": 5,
+      "type": "PreviewImage",
+      "pos": [780, 500],
+      "size": [360, 300],
+      "flags": {}, "order": 4, "mode": 0,
+      "inputs": [{"name": "images", "type": "IMAGE", "link": 4}],
+      "outputs": [], "properties": {"Node name for S&R": "PreviewImage"}, "widgets_values": []
+    },
+    {
+      "id": 6,
+      "type": "PreviewImage",
+      "pos": [1710, 100],
+      "size": [430, 360],
+      "flags": {}, "order": 5, "mode": 0,
+      "inputs": [{"name": "images", "type": "IMAGE", "link": 6}],
+      "outputs": [], "properties": {"Node name for S&R": "PreviewImage"}, "widgets_values": []
+    },
+    {
+      "id": 7,
+      "type": "SaveImage",
+      "pos": [1710, 520],
+      "size": [315, 270],
+      "flags": {}, "order": 6, "mode": 0,
+      "inputs": [{"name": "images", "type": "IMAGE", "link": 7}],
+      "outputs": [], "properties": {"Node name for S&R": "SaveImage"},
+      "widgets_values": ["korean_book_quote"]
+    }
+  ],
+  "links": [
+    [1, 1, 0, 2, 0, "IMAGE"], [2, 1, 1, 2, 1, "MASK"],
+    [3, 2, 0, 3, 0, "STRING"], [4, 2, 1, 5, 0, "IMAGE"],
+    [5, 3, 0, 4, 0, "STRING"], [6, 4, 0, 6, 0, "IMAGE"],
+    [7, 4, 0, 7, 0, "IMAGE"]
+  ],
+  "groups": [], "config": {},
+  "extra": {"ds": {"scale": 0.76, "offset": [20, 70]}},
+  "version": 0.4
+}
