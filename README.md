@@ -29,9 +29,9 @@ Restart ComfyUI. Load `korean_ocr_to_image.workflow.json` from this repository o
 1. Select a book photo in `Load Image`.
 2. Right-click the node and open **Mask Editor**.
 3. Paint only the paragraph to recognize and save the mask.
-4. Queue once. The recognized text appears in **OCR 텍스트 수정**.
-5. Correct OCR mistakes and line breaks. Add a short comment in the renderer.
-6. Queue again to render and save the annotated quote image.
+4. Queue once. The recognized text appears in **OCR 텍스트 수정 → 이미지**.
+5. Correct OCR mistakes, line breaks, Markdown styles, and comments in that same node.
+6. Queue again. The node renders the image directly for preview and saving.
 
 ## Inline style syntax
 

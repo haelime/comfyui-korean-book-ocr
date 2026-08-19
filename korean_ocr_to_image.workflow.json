@@ -37,23 +37,15 @@
       "id": 3,
       "type": "KoreanEditableText",
       "pos": [780, 160],
-      "size": [390, 280],
+      "size": [430, 600],
       "flags": {}, "order": 2, "mode": 0,
       "inputs": [{"name": "ocr_text", "type": "STRING", "link": 3}],
-      "outputs": [{"name": "final_text", "type": "STRING", "links": [5], "slot_index": 0}],
+      "outputs": [
+        {"name": "final_text", "type": "STRING", "links": null, "slot_index": 0},
+        {"name": "annotated_page", "type": "IMAGE", "links": [6, 7], "slot_index": 1}
+      ],
       "properties": {"Node name for S&R": "KoreanEditableText"},
-      "widgets_values": [""]
-    },
-    {
-      "id": 4,
-      "type": "KoreanBookTextToImage",
-      "pos": [1230, 160],
-      "size": [420, 520],
-      "flags": {}, "order": 3, "mode": 0,
-      "inputs": [{"name": "text", "type": "STRING", "link": 5}],
-      "outputs": [{"name": "annotated_page", "type": "IMAGE", "links": [6, 7], "slot_index": 0}],
-      "properties": {"Node name for S&R": "KoreanBookTextToImage"},
-      "widgets_values": ["", 1200, 48, 32, 80, 24, "AUTO", "AUTO", "#202020", "#3F6FB5", "#FFF176", "#FFFDF7"]
+      "widgets_values": ["", "", 1200, 48, 32, 80, 24, "AUTO", "AUTO", "#202020", "#3F6FB5", "#FFF176", "#FFFDF7"]
     },
     {
       "id": 5,
@@ -67,18 +59,18 @@
     {
       "id": 6,
       "type": "PreviewImage",
-      "pos": [1710, 100],
+      "pos": [1280, 100],
       "size": [430, 360],
-      "flags": {}, "order": 5, "mode": 0,
+      "flags": {}, "order": 4, "mode": 0,
       "inputs": [{"name": "images", "type": "IMAGE", "link": 6}],
       "outputs": [], "properties": {"Node name for S&R": "PreviewImage"}, "widgets_values": []
     },
     {
       "id": 7,
       "type": "SaveImage",
-      "pos": [1710, 520],
+      "pos": [1280, 520],
       "size": [315, 270],
-      "flags": {}, "order": 6, "mode": 0,
+      "flags": {}, "order": 5, "mode": 0,
       "inputs": [{"name": "images", "type": "IMAGE", "link": 7}],
       "outputs": [], "properties": {"Node name for S&R": "SaveImage"},
       "widgets_values": ["korean_book_quote"]
@@ -87,8 +79,7 @@
   "links": [
     [1, 1, 0, 2, 0, "IMAGE"], [2, 1, 1, 2, 1, "MASK"],
     [3, 2, 0, 3, 0, "STRING"], [4, 2, 1, 5, 0, "IMAGE"],
-    [5, 3, 0, 4, 0, "STRING"], [6, 4, 0, 6, 0, "IMAGE"],
-    [7, 4, 0, 7, 0, "IMAGE"]
+    [6, 3, 1, 6, 0, "IMAGE"], [7, 3, 1, 7, 0, "IMAGE"]
   ],
   "groups": [], "config": {},
   "extra": {"ds": {"scale": 0.76, "offset": [20, 70]}},

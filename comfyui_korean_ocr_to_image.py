@@ -205,18 +205,41 @@ class KoreanEditableText:
                     "STRING",
                     {"default": "", "multiline": True, "dynamicPrompts": False},
                 ),
+                "comment": (
+                    "STRING",
+                    {"default": "", "multiline": True, "dynamicPrompts": False},
+                ),
+                "width": ("INT", {"default": 1200, "min": 256, "max": 8192, "step": 8}),
+                "font_size": ("INT", {"default": 48, "min": 8, "max": 512}),
+                "comment_font_size": ("INT", {"default": 32, "min": 8, "max": 256}),
+                "padding": ("INT", {"default": 80, "min": 0, "max": 1024}),
+                "line_spacing": ("INT", {"default": 24, "min": 0, "max": 256}),
+                "font_path": ("STRING", {"default": "AUTO"}),
+                "comment_font_path": ("STRING", {"default": "AUTO"}),
+                "text_color": ("STRING", {"default": "#202020"}),
+                "pencil_color": ("STRING", {"default": "#3F6FB5"}),
+                "highlight_color": ("STRING", {"default": "#FFF176"}),
+                "background_color": ("STRING", {"default": "#FFFDF7"}),
             }
         }
 
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("final_text",)
+    RETURN_TYPES = ("STRING", "IMAGE")
+    RETURN_NAMES = ("final_text", "annotated_page")
     FUNCTION = "choose_text"
     CATEGORY = "Korean OCR"
 
-    def choose_text(self, ocr_text, edited_text):
+    def choose_text(self, ocr_text, edited_text, comment, width, font_size,
+                    comment_font_size, padding, line_spacing, font_path,
+                    comment_font_path, text_color, pencil_color,
+                    highlight_color, background_color):
         effective = edited_text if edited_text.strip() else ocr_text
+        image = KoreanBookTextToImage().render_book_page(
+            effective, comment, width, font_size, comment_font_size, padding,
+            line_spacing, font_path, comment_font_path, text_color,
+            pencil_color, highlight_color, background_color,
+        )[0]
         # The frontend uses ocr_text to populate the editable widget after pass one.
-        return {"ui": {"ocr_text": [ocr_text]}, "result": (effective,)}
+        return {"ui": {"ocr_text": [ocr_text]}, "result": (effective, image)}
 
 
 def _font_candidates(font_path: str):
@@ -560,15 +583,13 @@ NODE_CLASS_MAPPINGS = {
     "KoreanMaskedOCR": KoreanMaskedOCR,
     "KoreanEditableText": KoreanEditableText,
     "KoreanTextToImage": KoreanTextToImage,
-    "KoreanBookTextToImage": KoreanBookTextToImage,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "KoreanOCR": "한국어 OCR (PaddleOCR)",
     "KoreanMaskedOCR": "마스크 영역 한국어 OCR",
-    "KoreanEditableText": "OCR 텍스트 수정",
+    "KoreanEditableText": "OCR 텍스트 수정 → 이미지",
     "KoreanTextToImage": "한국어 텍스트 → 이미지",
-    "KoreanBookTextToImage": "책 문장 꾸미기 → 이미지",
 }
 
 WEB_DIRECTORY = "./comfyui_korean_ocr_web"
