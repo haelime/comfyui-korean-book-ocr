@@ -7,17 +7,107 @@
 - 사진마다 필요한 부분을 마스킹해 한 장씩 처리
 - 사진 폴더 전체를 TXT로 만든 뒤 한꺼번에 이미지로 변환
 
-## 설치
+## 1. ComfyUI 설치
+
+이미 ComfyUI를 사용하고 있다면 이 단계는 건너뛰세요.
+
+### Comfy Desktop 설치 — 권장
+
+1. [Comfy Desktop 공식 Windows 설치 안내](https://docs.comfy.org/installation/desktop/windows)에서 설치 파일을 받습니다.
+2. 받은 `.exe`를 실행합니다.
+3. Comfy Desktop을 열고 첫 번째 ComfyUI 설치본을 만듭니다.
+4. ComfyUI 화면이 정상적으로 열리는지 확인한 뒤 완전히 종료합니다.
+
+Comfy Desktop은 Windows 10 이상을 지원하며, 전용 GPU 사용이 권장됩니다. 설치 위치는 사용자가 바꿀 수 있습니다.
+
+### Windows portable 설치 — 선택
+
+Desktop 대신 압축판을 사용하려면 [ComfyUI portable 공식 안내](https://docs.comfy.org/installation/comfyui_portable_windows)를 따르세요.
+
+1. 그래픽카드에 맞는 압축 파일을 받습니다.
+2. 7-Zip 등으로 압축을 풉니다.
+3. NVIDIA 버전은 `run_nvidia_gpu.bat`을 더블클릭해 실행합니다.
+
+## 2. ComfyUI 폴더 찾기
+
+커스텀 노드는 반드시 현재 사용하는 ComfyUI의 `custom_nodes` 폴더 안에 넣어야 합니다.
+
+### Comfy Desktop의 일반적인 위치
+
+파일 탐색기 주소창에 다음 경로를 붙여넣습니다.
+
+```text
+%LOCALAPPDATA%\Comfy-Desktop\ComfyUI-Installs
+```
+
+설치 이름의 폴더를 차례로 열어 다음 구조를 찾습니다.
+
+```text
+ComfyUI-Installs/
+└─ 설치_이름/
+   └─ ComfyUI/
+      ├─ custom_nodes/   ← 여기에 설치
+      ├─ models/
+      └─ user/
+```
+
+일부 이전 Desktop 설치는 다음 위치를 사용합니다.
+
+```text
+%USERPROFILE%\ComfyUI-Installs
+```
+
+Comfy Desktop의 사진·결과 파일은 설치본과 별도로 다음 공유 폴더에 저장될 수 있습니다.
+
+```text
+%LOCALAPPDATA%\Comfy-Desktop\ComfyUI-Shared\input
+%LOCALAPPDATA%\Comfy-Desktop\ComfyUI-Shared\output
+```
+
+`Program Files` 안의 Comfy Desktop 프로그램 파일이나 `resource/ComfyUI`에는 커스텀 노드를 넣지 마세요.
+
+### Windows portable의 위치
+
+압축을 푼 장소에 따라 앞부분은 달라지지만 내부 구조는 다음과 같습니다.
+
+```text
+ComfyUI_windows_portable/
+├─ ComfyUI/
+│  └─ custom_nodes/      ← 여기에 설치
+├─ python_embeded/
+└─ run_nvidia_gpu.bat
+```
+
+예를 들어 바탕 화면에 압축을 풀었다면 다음과 비슷합니다.
+
+```text
+C:\Users\사용자이름\Desktop\ComfyUI_windows_portable\ComfyUI\custom_nodes
+```
+
+## 3. 한국어 책 OCR 설치
 
 1. ComfyUI를 완전히 종료합니다.
-2. 위쪽의 **Code → Download ZIP**으로 파일을 받습니다.
-3. 압축을 푼 폴더를 `ComfyUI/custom_nodes/` 안에 넣습니다.
-4. `install_windows.bat`을 더블클릭합니다.
-5. ComfyUI를 다시 실행하고 `korean_ocr_to_image` 워크플로우를 엽니다.
+2. 이 GitHub 페이지 위쪽의 **Code → Download ZIP**을 누릅니다.
+3. ZIP 압축을 풉니다.
+4. 압축을 푼 폴더 전체를 앞에서 찾은 `custom_nodes` 안에 넣습니다.
+5. 폴더 안의 `install_windows.bat`을 더블클릭합니다.
+6. **설치가 끝났습니다**라는 문구가 나오면 ComfyUI를 다시 실행합니다.
+7. 워크플로우 메뉴에서 `korean_ocr_to_image`를 엽니다.
 
-맞춤법 자동 교정을 사용하려면 [Ollama](https://ollama.com/download/windows)가 필요합니다. 설치 후 `install_windows.bat`을 다시 실행하면 Qwen 모델을 받을 수 있습니다.
+최종 구조는 다음과 같아야 합니다. 같은 이름의 폴더가 이중으로 들어가면 안 됩니다.
 
-자세한 설치 방법: [Windows 설치 가이드](docs/INSTALL.ko.md)
+```text
+ComfyUI/
+└─ custom_nodes/
+   └─ comfyui-korean-book-ocr-main/
+      ├─ __init__.py
+      ├─ install_windows.bat
+      └─ requirements.txt
+```
+
+맞춤법 자동 교정을 사용하려면 [Ollama](https://ollama.com/download/windows)를 설치합니다. 설치 후 `install_windows.bat`을 다시 실행하면 Qwen 모델 다운로드 여부를 묻습니다.
+
+더 자세한 내용: [Windows 설치 가이드](docs/INSTALL.ko.md)
 
 ## 권장 작업 폴더
 
