@@ -39,8 +39,6 @@ $workflowDir = Join-Path $comfyRoot "user\default\workflows"
 New-Item -ItemType Directory -Path $workflowDir -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $repoRoot "korean_ocr_to_image.workflow.json") `
     -Destination (Join-Path $workflowDir "korean_ocr_to_image.json") -Force
-Copy-Item -LiteralPath (Join-Path $repoRoot "korean_ocr_batch.workflow.json") `
-    -Destination (Join-Path $workflowDir "korean_ocr_batch.json") -Force
 $batchInputDir = Join-Path $comfyRoot "input\대량_OCR_사진"
 New-Item -ItemType Directory -Path $batchInputDir -Force | Out-Null
 

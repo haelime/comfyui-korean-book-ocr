@@ -1,6 +1,6 @@
 {
-  "last_node_id": 11,
-  "last_link_id": 10,
+  "last_node_id": 15,
+  "last_link_id": 12,
   "nodes": [
     {
       "id": 8,
@@ -65,7 +65,7 @@
       "flags": {}, "order": 3, "mode": 0,
       "inputs": [],
       "outputs": [
-        {"name": "스타일_설정", "type": "KOREAN_TEXT_STYLE", "links": [9], "slot_index": 0},
+        {"name": "스타일_설정", "type": "KOREAN_TEXT_STYLE", "links": [9, 11], "slot_index": 0},
         {"name": "스타일_미리보기", "type": "IMAGE", "links": [10], "slot_index": 1}
       ],
       "properties": {"Node name for S&R": "KoreanTextStyleSettings"},
@@ -124,6 +124,54 @@
       "inputs": [{"name": "images", "type": "IMAGE", "link": 7}],
       "outputs": [], "properties": {"Node name for S&R": "SaveImage"},
       "widgets_values": ["korean_book_quote"]
+    },
+    {
+      "id": 12,
+      "type": "Note",
+      "pos": [20, 1220],
+      "size": [2040, 250],
+      "flags": {}, "order": 13, "mode": 0,
+      "inputs": [], "outputs": [], "properties": {},
+      "widgets_values": ["같은 워크플로우에서 대량 작업하기\n\n1. ① 노드의 ‘사진 폴더 선택…’ 버튼으로 사진 폴더를 고르고 실행을 켠 뒤 Queue\n2. 생성된 TXT를 메모장 등에서 직접 수정하고 저장\n3. ① 실행을 끄고 ② 실행을 켠 뒤 Queue → TXT마다 PNG 한 장 생성\n\n위쪽 ‘글꼴·색상·크기 설정 + 미리보기’가 대량 이미지에도 함께 적용됩니다. 폴더는 Windows 폴더 창에서 자유롭게 선택할 수 있으며, 기존_텍스트_보호가 켜져 있으면 수정한 TXT를 덮어쓰지 않습니다."],
+      "color": "#3b3026", "bgcolor": "#57483a"
+    },
+    {
+      "id": 13,
+      "type": "KoreanBatchImagesToText",
+      "pos": [20, 1520],
+      "size": [500, 380],
+      "flags": {}, "order": 10, "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {"name": "작업_결과", "type": "STRING", "links": null, "slot_index": 0}
+      ],
+      "properties": {"Node name for S&R": "KoreanBatchImagesToText"},
+      "widgets_values": [false, "대량_OCR_사진", "korean_book_ocr/text", true, false, true]
+    },
+    {
+      "id": 14,
+      "type": "KoreanBatchTextToImages",
+      "pos": [1080, 1520],
+      "size": [500, 350],
+      "flags": {}, "order": 11, "mode": 0,
+      "inputs": [
+        {"name": "스타일_설정", "type": "KOREAN_TEXT_STYLE", "link": 11}
+      ],
+      "outputs": [
+        {"name": "작업_결과", "type": "STRING", "links": null, "slot_index": 0},
+        {"name": "마지막_이미지", "type": "IMAGE", "links": [12], "slot_index": 1}
+      ],
+      "properties": {"Node name for S&R": "KoreanBatchTextToImages"},
+      "widgets_values": [false, "korean_book_ocr/text", "korean_book_ocr/images", true]
+    },
+    {
+      "id": 15,
+      "type": "PreviewImage",
+      "pos": [1640, 1520],
+      "size": [420, 350],
+      "flags": {}, "order": 12, "mode": 0,
+      "inputs": [{"name": "images", "type": "IMAGE", "link": 12}],
+      "outputs": [], "properties": {"Node name for S&R": "PreviewImage"}, "widgets_values": []
     }
   ],
   "links": [
@@ -131,7 +179,9 @@
     [3, 2, 0, 9, 0, "STRING"], [4, 2, 1, 5, 0, "IMAGE"],
     [8, 9, 0, 3, 0, "STRING"], [9, 10, 0, 3, 1, "KOREAN_TEXT_STYLE"],
     [10, 10, 1, 11, 0, "IMAGE"], [6, 3, 1, 6, 0, "IMAGE"],
-    [7, 3, 1, 7, 0, "IMAGE"]
+    [7, 3, 1, 7, 0, "IMAGE"],
+    [11, 10, 0, 14, 0, "KOREAN_TEXT_STYLE"],
+    [12, 14, 1, 15, 0, "IMAGE"]
   ],
   "groups": [], "config": {},
   "extra": {"ds": {"scale": 0.68, "offset": [20, 90]}},

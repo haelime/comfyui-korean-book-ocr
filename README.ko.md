@@ -41,7 +41,7 @@ ollama pull qwen3:8b
 
 ## 폴더 대량 작업
 
-`korean_ocr_batch` 워크플로우는 많은 사진을 파일 단위로 처리합니다.
+기존 `korean_ocr_to_image` 워크플로우 아래쪽의 대량 작업 구역에서 많은 사진을 파일 단위로 처리할 수 있습니다.
 
 1. `ComfyUI/input/대량_OCR_사진`에 사진을 넣습니다. 하위 폴더도 인식하며, 노드의 `사진 폴더 선택…` 버튼으로 다른 폴더를 고를 수 있습니다.
 2. `① 사진 폴더 → OCR 텍스트 파일`을 실행하면 같은 이름의 TXT가 `output/korean_book_ocr/text`에 생성됩니다.
