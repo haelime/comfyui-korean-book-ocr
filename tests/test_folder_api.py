@@ -84,6 +84,27 @@ class FolderApiTests(unittest.TestCase):
         self.assertEqual([name for name, _ in calls], ["show", "topmost", "bring", "foreground"])
         self.assertEqual(calls[1][1][1], -1)
 
+    def test_modern_picker_falls_back_to_legacy_dialog(self):
+        fake_folder_paths = types.SimpleNamespace(
+            get_input_directory=lambda: "input",
+            get_output_directory=lambda: "output",
+        )
+        fake_server = types.SimpleNamespace(
+            PromptServer=types.SimpleNamespace(instance=types.SimpleNamespace(routes=_Routes()))
+        )
+        with patch.dict(sys.modules, {"folder_paths": fake_folder_paths, "server": fake_server}):
+            spec = importlib.util.spec_from_file_location("folder_api_fallback_test", ROOT / "folder_api.py")
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+
+        with patch.object(module, "_pick_modern_windows_folder", side_effect=OSError("COM 실패")), patch.object(
+            module, "_pick_legacy_windows_folder", return_value="C:\\선택"
+        ) as legacy:
+            selected = module._pick_windows_folder("C:\\시작", "폴더 선택")
+
+        self.assertEqual(selected, "C:\\선택")
+        legacy.assert_called_once_with("C:\\시작", "폴더 선택")
+
 
 if __name__ == "__main__":
     unittest.main()
