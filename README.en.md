@@ -9,6 +9,30 @@ Two workflows are available in the same `korean_ocr_to_image` workspace:
 - Process one photo at a time with a painted mask.
 - Convert an entire image folder to TXT files, review them, then render one PNG per TXT file.
 
+<details>
+<summary>Example: source image → OCR text → rendered image</summary>
+
+#### 1. Source image
+
+![Example photo for Korean book OCR](examples/wakamo.jpg)
+
+#### 2. Extracted text
+
+```text
+장르: 소셜 채널
+P
+와카모는
+책을 먹었어요
+```
+
+[Open the text file](examples/wakamo.txt)
+
+#### 3. Rendered result
+
+![Rendered OCR text](examples/wakamo.png)
+
+</details>
+
 ## 1. Install ComfyUI
 
 Skip this section if ComfyUI is already installed.

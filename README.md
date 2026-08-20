@@ -9,6 +9,30 @@
 - 사진마다 필요한 부분을 마스킹해 한 장씩 처리
 - 사진 폴더 전체를 TXT로 만든 뒤 한꺼번에 이미지로 변환
 
+<details>
+<summary>예시: 원본 이미지 → OCR 텍스트 → 결과 이미지</summary>
+
+#### 1. 원본 이미지
+
+![한국어 책 OCR 예시 사진](examples/wakamo.jpg)
+
+#### 2. 추출한 텍스트
+
+```text
+장르: 소셜 채널
+P
+와카모는
+책을 먹었어요
+```
+
+[텍스트 파일 열기](examples/wakamo.txt)
+
+#### 3. 이미지화 결과
+
+![OCR 텍스트 이미지화 결과](examples/wakamo.png)
+
+</details>
+
 ## 1. ComfyUI 설치
 
 이미 ComfyUI를 사용하고 있다면 이 단계는 건너뛰세요.
