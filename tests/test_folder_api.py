@@ -59,6 +59,31 @@ class FolderApiTests(unittest.TestCase):
         self.assertTrue(module._is_local_request(types.SimpleNamespace(remote="::1")))
         self.assertFalse(module._is_local_request(types.SimpleNamespace(remote="192.168.0.10")))
 
+    def test_native_dialog_is_made_topmost_and_foreground(self):
+        fake_folder_paths = types.SimpleNamespace(
+            get_input_directory=lambda: "input",
+            get_output_directory=lambda: "output",
+        )
+        fake_server = types.SimpleNamespace(
+            PromptServer=types.SimpleNamespace(instance=types.SimpleNamespace(routes=_Routes()))
+        )
+        with patch.dict(sys.modules, {"folder_paths": fake_folder_paths, "server": fake_server}):
+            spec = importlib.util.spec_from_file_location("folder_api_front_test", ROOT / "folder_api.py")
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+
+        calls = []
+        user32 = types.SimpleNamespace(
+            ShowWindow=lambda *args: calls.append(("show", args)),
+            SetWindowPos=lambda *args: calls.append(("topmost", args)),
+            BringWindowToTop=lambda *args: calls.append(("bring", args)),
+            SetForegroundWindow=lambda *args: calls.append(("foreground", args)),
+        )
+        module._bring_windows_dialog_to_front(user32, 100, -1)
+
+        self.assertEqual([name for name, _ in calls], ["show", "topmost", "bring", "foreground"])
+        self.assertEqual(calls[1][1][1], -1)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -27,6 +27,26 @@ def _is_local_request(request):
     return remote in (None, "127.0.0.1", "::1", "::ffff:127.0.0.1")
 
 
+def _bring_windows_dialog_to_front(user32, window, topmost_handle):
+    """Show, activate, and keep the native picker above the ComfyUI window."""
+    SWP_NOSIZE = 0x0001
+    SWP_NOMOVE = 0x0002
+    SWP_SHOWWINDOW = 0x0040
+    SW_RESTORE = 9
+    user32.ShowWindow(window, SW_RESTORE)
+    user32.SetWindowPos(
+        window,
+        topmost_handle,
+        0,
+        0,
+        0,
+        0,
+        SWP_NOSIZE | SWP_NOMOVE | SWP_SHOWWINDOW,
+    )
+    user32.BringWindowToTop(window)
+    user32.SetForegroundWindow(window)
+
+
 def _pick_windows_folder(initial_folder: str, title: str):
     """Open the native Windows Shell folder browser and return an absolute path."""
     if os.name != "nt":
@@ -62,6 +82,24 @@ def _pick_windows_folder(initial_folder: str, title: str):
         wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM
     ]
     user32.SendMessageW.restype = wintypes.LPARAM
+    user32.GetForegroundWindow.argtypes = []
+    user32.GetForegroundWindow.restype = wintypes.HWND
+    user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+    user32.ShowWindow.restype = wintypes.BOOL
+    user32.SetWindowPos.argtypes = [
+        wintypes.HWND,
+        wintypes.HWND,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        wintypes.UINT,
+    ]
+    user32.SetWindowPos.restype = wintypes.BOOL
+    user32.BringWindowToTop.argtypes = [wintypes.HWND]
+    user32.BringWindowToTop.restype = wintypes.BOOL
+    user32.SetForegroundWindow.argtypes = [wintypes.HWND]
+    user32.SetForegroundWindow.restype = wintypes.BOOL
     ole32.CoInitialize.argtypes = [ctypes.c_void_p]
     ole32.CoInitialize.restype = ctypes.c_long
     ole32.CoTaskMemFree.argtypes = [ctypes.c_void_p]
@@ -78,15 +116,18 @@ def _pick_windows_folder(initial_folder: str, title: str):
     BIF_RETURNONLYFSDIRS = 0x0001
     BIF_EDITBOX = 0x0010
     BIF_NEWDIALOGSTYLE = 0x0040
+    owner_window = user32.GetForegroundWindow()
+    topmost_handle = wintypes.HWND(-1)
 
     @browse_callback
     def callback(window, message, _lparam, data):
         if message == BFFM_INITIALIZED and data:
             user32.SendMessageW(window, BFFM_SETSELECTIONW, 1, data)
+            _bring_windows_dialog_to_front(user32, window, topmost_handle)
         return 0
 
     info = BROWSEINFOW(
-        None,
+        owner_window,
         None,
         ctypes.cast(display_name, wintypes.LPWSTR),
         title,
