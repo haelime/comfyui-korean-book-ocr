@@ -10,6 +10,8 @@ from __future__ import annotations
 import os
 import re
 import json
+import hashlib
+import random
 import urllib.error
 import urllib.request
 from functools import lru_cache
@@ -637,6 +639,63 @@ def _draw_italic_text(canvas, xy, text, font, fill):
     canvas.alpha_composite(slanted, (int(xy[0]), int(xy[1])))
 
 
+def _draw_colored_pencil_underline(draw, x, baseline, span_width, color, font_size, seed_text):
+    """Draw a deterministic multi-strand underline with waxy pencil grain."""
+    if span_width <= 0:
+        return
+    seed = int.from_bytes(
+        hashlib.blake2b(seed_text.encode("utf-8"), digest_size=8).digest(), "big"
+    )
+    rng = random.Random(seed)
+    stroke_width = max(1, font_size // 30)
+
+    # Sparse pigment dust makes the edge feel dry without blurring the text.
+    grain_count = max(8, span_width // 7)
+    for _ in range(grain_count):
+        px = x + rng.uniform(0, span_width)
+        py = baseline + rng.uniform(-3.8, 4.2)
+        radius = rng.choice((0.35, 0.5, 0.8, 1.0))
+        alpha = rng.randint(18, 48)
+        draw.ellipse(
+            (px - radius, py - radius, px + radius, py + radius),
+            fill=color + (alpha,),
+        )
+
+    # Several imperfect strands create visible tooth and tiny paper gaps.
+    strand_settings = ((-1.3, 58), (0.2, 102), (1.5, 50))
+    for strand_index, (offset, base_alpha) in enumerate(strand_settings):
+        cursor = 0.0
+        previous_y = baseline + offset + rng.uniform(-0.7, 0.7)
+        while cursor < span_width:
+            segment = min(rng.uniform(4.0, 12.0), span_width - cursor)
+            gap = rng.uniform(0.4, 2.6) if rng.random() < 0.32 else rng.uniform(0.0, 0.7)
+            end = max(cursor, min(span_width, cursor + segment - gap))
+            next_y = baseline + offset + rng.uniform(-1.2, 1.2)
+            if end > cursor and rng.random() > 0.08:
+                pressure = rng.uniform(0.72, 1.28)
+                alpha = max(18, min(145, round(base_alpha * pressure)))
+                draw.line(
+                    ((x + cursor, previous_y), (x + end, next_y)),
+                    fill=color + (alpha,),
+                    width=stroke_width + (1 if strand_index == 1 and pressure > 1.08 else 0),
+                )
+            cursor += segment
+            previous_y = next_y
+
+    # Short darker deposits imitate places where hand pressure increased.
+    deposit_count = max(1, span_width // 110)
+    for _ in range(deposit_count):
+        start = rng.uniform(0, max(0, span_width - 12))
+        length = min(rng.uniform(7, 24), span_width - start)
+        y1 = baseline + rng.uniform(-0.8, 0.8)
+        y2 = y1 + rng.uniform(-0.5, 0.5)
+        draw.line(
+            ((x + start, y1), (x + start + length, y2)),
+            fill=color + (rng.randint(105, 155),),
+            width=stroke_width,
+        )
+
+
 class KoreanTextToImage:
     @classmethod
     def INPUT_TYPES(cls):
@@ -794,15 +853,15 @@ class KoreanBookTextToImage:
                     draw.text((x, y), value, font=font, fill=text_fill)
                 if style == "underline" and value:
                     baseline = y + main_height + 7
-                    offsets = ((0, 0, 90), (2, 1, 65), (-1, 3, 45))
-                    for dx, dy, alpha in offsets:
-                        points = []
-                        segments = max(2, span_width // 24)
-                        for step in range(segments + 1):
-                            px = x + dx + (span_width * step / segments)
-                            jitter = ((step * 7 + line_index * 3) % 5) - 2
-                            points.append((px, baseline + dy + jitter * 0.35))
-                        draw.line(points, fill=pencil_rgb + (alpha,), width=max(1, font_size // 25))
+                    _draw_colored_pencil_underline(
+                        draw,
+                        x,
+                        baseline,
+                        span_width,
+                        pencil_rgb,
+                        font_size,
+                        f"{line_index}:{value}",
+                    )
                 x += span_width
             y += main_height + line_spacing
 
