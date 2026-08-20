@@ -33,6 +33,15 @@ class WorkflowFileTests(unittest.TestCase):
             }
             self.assertLessEqual(custom_types, set(MODULE.NODE_CLASS_MAPPINGS))
 
+    def test_desktop_docs_do_not_point_batch_users_at_install_local_input(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        workflow_doc = (ROOT / "docs" / "WORKFLOW.ko.md").read_text(encoding="utf-8")
+        installer = (ROOT / "scripts" / "install_windows.ps1").read_text(encoding="utf-8")
+
+        self.assertNotIn("ComfyUI/input/대량_OCR_사진", readme)
+        self.assertNotIn("ComfyUI/input/대량_OCR_사진", workflow_doc)
+        self.assertIn("ComfyUI-Shared", installer)
+
 
 if __name__ == "__main__":
     unittest.main()

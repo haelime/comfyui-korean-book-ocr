@@ -102,6 +102,22 @@ class BatchFolderTests(unittest.TestCase):
         self.assertEqual((self.output_root / "텍스트" / "페이지.txt").read_text(encoding="utf-8"), "OCR 원문\n")
         self.assertIn("AI 교정 경고 1개", result["result"][0])
 
+    def test_absolute_folder_selected_by_winapi_processes_every_nested_photo(self):
+        selected = self.root / "사용자가 고른 사진 폴더"
+        (selected / "하위").mkdir(parents=True)
+        Image.new("RGB", (20, 20), "white").save(selected / "하나.jpg")
+        Image.new("RGB", (20, 20), "white").save(selected / "하위" / "둘.png")
+        text_output = self.root / "사용자가 고른 텍스트 폴더"
+
+        with patch.object(MODULE.KoreanOCR, "recognize", return_value=("폴더 OCR",)):
+            result = MODULE.KoreanBatchImagesToText().process_folder(
+                True, str(selected), str(text_output), True, False, False,
+            )
+
+        self.assertEqual((text_output / "하나.txt").read_text(encoding="utf-8"), "폴더 OCR\n")
+        self.assertEqual((text_output / "하위" / "둘.txt").read_text(encoding="utf-8"), "폴더 OCR\n")
+        self.assertIn("사진 2개 확인", result["result"][0])
+
 
 if __name__ == "__main__":
     unittest.main()
