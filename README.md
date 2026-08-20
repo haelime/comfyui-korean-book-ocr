@@ -1,5 +1,7 @@
 # ComfyUI 한국어 책 OCR
 
+[한국어](README.md) | [English](README.en.md)
+
 책 사진을 한국어로 OCR하고, Qwen으로 오타와 맞춤법을 교정한 뒤 문장 이미지로 저장하는 ComfyUI 워크플로우입니다.
 
 작업 방식은 두 가지입니다.
