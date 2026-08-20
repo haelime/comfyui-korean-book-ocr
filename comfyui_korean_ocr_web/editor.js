@@ -79,7 +79,7 @@ async function pickComfyFolder(node, widgetName, kind, title) {
       }
       return;
     }
-    if (nativeResponse.status !== 501) {
+    if (![404, 501].includes(nativeResponse.status)) {
       const nativeError = await nativeResponse.json().catch(() => ({}));
       throw new Error(nativeError.error || `HTTP ${nativeResponse.status}`);
     }
@@ -136,7 +136,6 @@ app.registerExtension({
         ["텍스트_저장_폴더", "output", "텍스트 저장 폴더 선택"],
       ],
       KoreanBatchTextToImages: [
-        ["텍스트_폴더", "output", "수정한 텍스트 폴더 선택"],
         ["이미지_저장_폴더", "output", "이미지 저장 폴더 선택"],
       ],
     };

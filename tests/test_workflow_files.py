@@ -20,9 +20,11 @@ class WorkflowFileTests(unittest.TestCase):
         self.assertIn("KoreanBatchImagesToText", nodes)
         self.assertIn("KoreanBatchTextToImages", nodes)
         self.assertEqual(len(nodes["KoreanBatchImagesToText"]["widgets_values"]), 6)
-        self.assertEqual(len(nodes["KoreanBatchTextToImages"]["widgets_values"]), 4)
+        self.assertEqual(len(nodes["KoreanBatchTextToImages"]["widgets_values"]), 3)
         self.assertFalse(nodes["KoreanBatchImagesToText"]["widgets_values"][0])
         self.assertFalse(nodes["KoreanBatchTextToImages"]["widgets_values"][0])
+        path_links = [link for link in workflow["links"] if link[5] == "STRING" and link[1] == nodes["KoreanBatchImagesToText"]["id"]]
+        self.assertIn([13, 13, 1, 14, 1, "STRING"], path_links)
 
     def test_every_custom_workflow_node_is_registered(self):
         for filename in ("korean_ocr_to_image.workflow.json",):

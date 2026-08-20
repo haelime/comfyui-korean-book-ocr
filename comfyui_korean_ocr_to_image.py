@@ -833,8 +833,8 @@ class KoreanBatchImagesToText:
             }
         }
 
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("작업_결과",)
+    RETURN_TYPES = ("STRING", "STRING")
+    RETURN_NAMES = ("작업_결과", "텍스트_폴더")
     FUNCTION = "process_folder"
     CATEGORY = "한국어 OCR/대량 작업"
     OUTPUT_NODE = True
@@ -849,12 +849,12 @@ class KoreanBatchImagesToText:
         output_folder = _resolve_batch_folder(텍스트_저장_폴더, "output", create=True)
         if not 실행:
             summary = "1단계가 꺼져 있습니다. 사진 OCR을 시작하려면 실행을 켜세요."
-            return {"ui": {"text": [summary]}, "result": (summary,)}
+            return {"ui": {"text": [summary]}, "result": (summary, str(output_folder))}
 
         sources = _batch_files(input_folder, _IMAGE_EXTENSIONS)
         if not sources:
             summary = f"사진이 없습니다. 이 폴더에 사진을 넣으세요:\n{input_folder}"
-            return {"ui": {"text": [summary]}, "result": (summary,)}
+            return {"ui": {"text": [summary]}, "result": (summary, str(output_folder))}
 
         ocr_node = KoreanOCR()
         correction_node = KoreanOCRAutoCorrect()
@@ -899,7 +899,7 @@ class KoreanBatchImagesToText:
         if errors:
             lines.extend(["", "오류 목록:", *errors])
         summary = "\n".join(lines)
-        return {"ui": {"text": [summary]}, "result": (summary,)}
+        return {"ui": {"text": [summary]}, "result": (summary, str(output_folder))}
 
 
 class KoreanBatchTextToImages:
@@ -909,7 +909,7 @@ class KoreanBatchTextToImages:
             "required": {
                 "스타일_설정": ("KOREAN_TEXT_STYLE", {"forceInput": True}),
                 "실행": ("BOOLEAN", {"default": False}),
-                "텍스트_폴더": ("STRING", {"default": "korean_book_ocr/text"}),
+                "텍스트_폴더": ("STRING", {"forceInput": True}),
                 "이미지_저장_폴더": ("STRING", {"default": "korean_book_ocr/images"}),
                 "기존_이미지_덮어쓰기": ("BOOLEAN", {"default": True}),
             }

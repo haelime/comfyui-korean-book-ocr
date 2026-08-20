@@ -1,6 +1,6 @@
 {
   "last_node_id": 15,
-  "last_link_id": 12,
+  "last_link_id": 13,
   "nodes": [
     {
       "id": 8,
@@ -132,7 +132,7 @@
       "size": [2040, 250],
       "flags": {}, "order": 13, "mode": 0,
       "inputs": [], "outputs": [], "properties": {},
-      "widgets_values": ["같은 워크플로우에서 대량 작업하기\n\n1. ① 노드의 ‘사진 폴더 선택…’ 버튼으로 사진 폴더를 고르고 실행을 켠 뒤 Queue\n2. 생성된 TXT를 메모장 등에서 직접 수정하고 저장\n3. ① 실행을 끄고 ② 실행을 켠 뒤 Queue → TXT마다 PNG 한 장 생성\n\n위쪽 ‘글꼴·색상·크기 설정 + 미리보기’가 대량 이미지에도 함께 적용됩니다. 폴더는 Windows 폴더 창에서 자유롭게 선택할 수 있으며, 기존_텍스트_보호가 켜져 있으면 수정한 TXT를 덮어쓰지 않습니다."],
+      "widgets_values": ["같은 워크플로우에서 대량 작업하기\n\n1. ① 노드에서 사진 폴더와 TXT 저장 폴더를 고르고 실행을 켠 뒤 Queue\n2. 생성된 TXT를 메모장 등에서 직접 수정하고 저장\n3. ① 실행을 끄고 ②에서 이미지 저장 폴더와 실행을 설정한 뒤 Queue\n\n①의 텍스트_폴더 출력은 ②에 연결되어 있어 실행을 꺼도 경로가 전달됩니다. 위쪽 스타일 설정은 대량 이미지에도 함께 적용됩니다. 기존_텍스트_보호가 켜져 있으면 수정한 TXT를 덮어쓰지 않습니다."],
       "color": "#3b3026", "bgcolor": "#57483a"
     },
     {
@@ -143,7 +143,8 @@
       "flags": {}, "order": 10, "mode": 0,
       "inputs": [],
       "outputs": [
-        {"name": "작업_결과", "type": "STRING", "links": null, "slot_index": 0}
+        {"name": "작업_결과", "type": "STRING", "links": null, "slot_index": 0},
+        {"name": "텍스트_폴더", "type": "STRING", "links": [13], "slot_index": 1}
       ],
       "properties": {"Node name for S&R": "KoreanBatchImagesToText"},
       "widgets_values": [false, "대량_OCR_사진", "korean_book_ocr/text", true, false, true]
@@ -155,14 +156,15 @@
       "size": [500, 350],
       "flags": {}, "order": 11, "mode": 0,
       "inputs": [
-        {"name": "스타일_설정", "type": "KOREAN_TEXT_STYLE", "link": 11}
+        {"name": "스타일_설정", "type": "KOREAN_TEXT_STYLE", "link": 11},
+        {"name": "텍스트_폴더", "type": "STRING", "link": 13}
       ],
       "outputs": [
         {"name": "작업_결과", "type": "STRING", "links": null, "slot_index": 0},
         {"name": "마지막_이미지", "type": "IMAGE", "links": [12], "slot_index": 1}
       ],
       "properties": {"Node name for S&R": "KoreanBatchTextToImages"},
-      "widgets_values": [false, "korean_book_ocr/text", "korean_book_ocr/images", true]
+      "widgets_values": [false, "korean_book_ocr/images", true]
     },
     {
       "id": 15,
@@ -181,7 +183,8 @@
     [10, 10, 1, 11, 0, "IMAGE"], [6, 3, 1, 6, 0, "IMAGE"],
     [7, 3, 1, 7, 0, "IMAGE"],
     [11, 10, 0, 14, 0, "KOREAN_TEXT_STYLE"],
-    [12, 14, 1, 15, 0, "IMAGE"]
+    [12, 14, 1, 15, 0, "IMAGE"],
+    [13, 13, 1, 14, 1, "STRING"]
   ],
   "groups": [], "config": {},
   "extra": {"ds": {"scale": 0.68, "offset": [20, 90]}},

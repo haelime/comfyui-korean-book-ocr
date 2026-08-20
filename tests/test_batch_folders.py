@@ -117,6 +117,7 @@ class BatchFolderTests(unittest.TestCase):
         self.assertEqual((text_output / "하나.txt").read_text(encoding="utf-8"), "폴더 OCR\n")
         self.assertEqual((text_output / "하위" / "둘.txt").read_text(encoding="utf-8"), "폴더 OCR\n")
         self.assertIn("사진 2개 확인", result["result"][0])
+        self.assertEqual(result["result"][1], str(text_output.resolve()))
 
 
 if __name__ == "__main__":
